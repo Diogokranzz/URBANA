@@ -30,7 +30,7 @@ O projeto segue a norma da língua portuguesa do Brasil em toda a interface, nos
 
 O servidor escuta apenas em 127.0.0.1 por padrão, ou seja, ninguém fora da sua máquina acessa o jogo. Para liberar o acesso na rede local, use a variável de ambiente URBANA_HOST com o valor 0.0.0.0 antes do comando, e em hospedagens de nuvem a porta é lida automaticamente da variável de ambiente PORT, que serviços como Render e Railway definem sozinhos.
 
-A porta padrão é 8137 e o WebSocket do multiplayer responde na rota /ws do mesmo endereço, sem depender de bibliotecas externas. Se o jogo estiver publicado em um site estático e o servidor do multiplayer rodar em outro endereço, basta definir a chave urbana-server no armazenamento local do navegador apontando para o endereço do servidor.
+A porta padrão é 8137 e o WebSocket do multiplayer responde na rota /ws do mesmo endereço, sem depender de bibliotecas externas. Se o jogo estiver publicado em um site estático e o servidor do multiplayer rodar em outro endereço, basta definir a chave de servidor personalizado no armazenamento local do navegador, com o nome urbana e o sufixo de servidor, apontando para o endereço do servidor.
 
 <img src="docs/divider.svg" width="100%">
 
