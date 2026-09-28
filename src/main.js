@@ -107,6 +107,28 @@ function adjustSens(delta) {
 
 let chatOpen = false;
 let touchMode = false;
+let touchFiring = false;
+function armTouchActivation() {
+  const tapTargets = Array.from(document.querySelectorAll('#overlay .btn, #quality button, .op-card'));
+  tapTargets.forEach(el => {
+    if (el.__tapArmed) return;
+    el.__tapArmed = true;
+    el.addEventListener('touchstart', e => { e.preventDefault(); el.__tapOk = true; }, { passive: false });
+    el.addEventListener('touchmove', e => {
+      if (!el.__tapOk) return;
+      const t = e.changedTouches[0];
+      const r = el.getBoundingClientRect();
+      const pad = 14;
+      if (t.clientX < r.left - pad || t.clientX > r.right + pad || t.clientY < r.top - pad || t.clientY > r.bottom + pad) el.__tapOk = false;
+    }, { passive: true });
+    el.addEventListener('touchend', e => {
+      if (!el.__tapOk) return;
+      el.__tapOk = false;
+      e.preventDefault();
+      el.click();
+    }, { passive: false });
+  });
+}
 function openChat() {
   chatOpen = true;
   const inp = document.getElementById('chat-input');
@@ -902,12 +924,30 @@ function frame(nowT) {
   const dt = Math.min(0.05, (nowT - lastT) / 1000);
   lastT = nowT;
   if (!state.running) { menuCamera(nowT); renderOperatorSelect(Math.min(0.05, dt)); render(); return; }
-  if (state.paused && !touchMode) { render(); return; }
+  if (state.paused) {
+    syncPauseFromTip();
+    if (state.paused) { render(); return; }
+  }
   if (state.over) { render(); return; }
 
   state.time += dt;
   update(dt);
   render();
+}
+
+let rotateTipVisible = false;
+function syncPauseFromTip() {
+  const tip = document.getElementById('touch-rotate-tip');
+  const showing = !!(tip && tip.classList.contains('on'));
+  if (showing && !rotateTipVisible) {
+    rotateTipVisible = true;
+    state.paused = true;
+    showOverlay('pause');
+  } else if (!showing && rotateTipVisible) {
+    rotateTipVisible = false;
+    state.paused = false;
+    hideOverlay();
+  }
 }
 
 function update(dt) {
@@ -1062,7 +1102,7 @@ function update(dt) {
     throwAnim: state.grenadeThrowT,
   });
 
-  if (mouseDown && pointerLocked && !vehicle) {
+  if ((mouseDown || touchFiring) && !vehicle) {
     const d = weapons.def;
     const rpmInterval = 60 / d.rpm;
      if (weapons.slot === 3) {
@@ -1271,8 +1311,12 @@ function initMenuInteractivity() {
     }
   });
 }
+const forceTouch = new URLSearchParams(location.search).has('touch');
 initMenuInteractivity();
 initQualityUi();
+if (forceTouch || ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || (window.matchMedia && matchMedia('(pointer: coarse)').matches)) {
+  document.body.classList.add('touch');
+}
 initTouchControls();
 
 let opRenderer = null, opScene = null, opCam = null, opMesh = null, opSpin = 0, opKind = 'police';
@@ -1376,8 +1420,10 @@ $('btn-start').addEventListener('click', () => {
 $('btn-deploy').addEventListener('click', () => {
   audio.uiConfirm();
   applyOperator();
+  $('screen-select').classList.add('hidden');
   hideOverlay();
   state.running = true;
+  state.paused = false;
   if (!touchMode) lockPointer();
 });
 document.querySelectorAll('.op-card').forEach((c, i) => c.addEventListener('click', () => selectOperator(i)));
@@ -1419,7 +1465,7 @@ $('btn-restart').addEventListener('click', () => {
   hideOverlay();
   state.running = true;
   state.paused = false;
-  lockPointer();
+  if (!touchMode) lockPointer();
   net.connect(
     (txt, color) => killFeed(txt, color),
     b => {
@@ -1466,8 +1512,35 @@ window.__fpsDebug = {
   get avatar() { return playerAvatar; },
 };
 
+function initTouchWeaponBar() {
+  const bar = document.getElementById('hud-weaponbar');
+  if (!bar) return;
+  bar.style.display = 'flex';
+  const build = () => {
+    const defs = weapons.defs.map((d, i) => ({ d, i })).filter(x => [0, 1, 2, 4, 5].includes(x.i));
+    bar.innerHTML = defs.map(({ d, i }) =>
+      `<div class="wchip" data-i="${i}"><b>${['1','2','3','4','5'][defs.findIndex(z => z.i === i)]}</b>${d.name.split(' ')[0].slice(0, 6)}</div>`
+    ).join('') + `<div class="wchip wgn" data-i="3"><b>G</b>${weapons.grenades}</div>`;
+    bar.querySelectorAll('.wchip').forEach(ch => {
+      ch.addEventListener('click', () => { if (state.running && !state.over) weapons.switchTo(+ch.dataset.i); });
+    });
+    syncTouchWeaponBar();
+  };
+  build();
+  window.__touchWeaponBarBuilt = build;
+  setInterval(() => { if (document.getElementById('touch-ui')) syncTouchWeaponBar(); }, 400);
+}
+function syncTouchWeaponBar() {
+  const bar = document.getElementById('hud-weaponbar');
+  if (!bar) return;
+  bar.querySelectorAll('.wchip').forEach(ch => {
+    ch.classList.toggle('on', weapons.slot === +ch.dataset.i);
+    if (ch.dataset.i === '3') ch.lastChild && (ch.lastChild.textContent = weapons.grenades);
+  });
+}
+
 function initTouchControls() {
-  const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || (window.matchMedia && matchMedia('(pointer: coarse)').matches);
+  const isTouch = forceTouch || ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || (window.matchMedia && matchMedia('(pointer: coarse)').matches);
   const ui = document.getElementById('touch-ui');
   if (!isTouch || !ui) return;
   touchMode = true;
@@ -1475,13 +1548,41 @@ function initTouchControls() {
   const stick = document.getElementById('touch-stick');
   const knob = document.getElementById('touch-knob');
   const look = document.getElementById('touch-look');
+  const fire = document.getElementById('touch-fire');
+  const ads = document.getElementById('touch-ads');
+  const rotateTip = document.getElementById('touch-rotate-tip');
   let stickId = null, lookId = null;
   let stickCx = 0, stickCy = 0, lookX = 0, lookY = 0;
 
+  const syncCarCluster = () => {
+    const cluster = document.getElementById('tc-drive');
+    if (cluster) cluster.style.display = vehicle ? 'flex' : 'none';
+    const foot = document.getElementById('tc-foot');
+    if (foot) foot.style.display = vehicle ? 'none' : 'flex';
+    const cbts = document.querySelectorAll('#touch-ui .cbt');
+    cbts.forEach(b => b.style.display = vehicle ? 'none' : '');
+  };
+  syncCarCluster();
+  setInterval(syncCarCluster, 400);
+
+  const syncRotateTip = () => {
+    if (!rotateTip) return;
+    const portrait = innerHeight > innerWidth;
+    rotateTip.classList.toggle('on', portrait && state.running && !state.over);
+    if (portrait && state.running && !state.over && !state.paused) {
+      state.paused = true;
+      showOverlay('pause');
+    }
+  };
+  syncRotateTip();
+  addEventListener('resize', syncRotateTip);
+  setInterval(syncRotateTip, 400);
+
   ui.querySelectorAll('.tbtn').forEach(btn => {
     const code = btn.dataset.k;
-    const down = e => { e.preventDefault(); keys[code] = true; btn.classList.add('held'); if (window.__uiSetKeyVisual) window.__uiSetKeyVisual(code, true); if (code === 'KeyE' && state.running && !state.over) { vehicle ? exitVehicle() : enterVehicle(); } if (code === 'KeyV' && state.running && !state.over) toggleThirdPerson(); };
-    const up = e => { e.preventDefault(); keys[code] = false; btn.classList.remove('held'); if (window.__uiSetKeyVisual) window.__uiSetKeyVisual(code, false); };
+    const down = e => { e.preventDefault(); btn.__down = true; keys[code] = true; btn.classList.add('held'); if (window.__uiSetKeyVisual) window.__uiSetKeyVisual(code, true); if (code === 'KeyQ' && state.running && !state.over) toggleLoadout(); };
+    const up = e => { if (!btn.__down) return; e.preventDefault(); btn.__down = false; keys[code] = false; btn.classList.remove('held'); if (window.__uiSetKeyVisual) window.__uiSetKeyVisual(code, false); };
+    btn.addEventListener('touchcancel', () => { btn.__down = false; keys[code] = false; btn.classList.remove('held'); });
     btn.addEventListener('touchstart', down, { passive: false });
     btn.addEventListener('touchend', up, { passive: false });
     btn.addEventListener('touchcancel', up, { passive: false });
@@ -1522,6 +1623,7 @@ function initTouchControls() {
   look.addEventListener('touchstart', e => {
     const t = e.changedTouches[0];
     lookId = t.identifier; lookX = t.clientX; lookY = t.clientY;
+    if (state.running && !state.over) { touchFiring = true; mouseDown = true; }
     e.preventDefault();
   }, { passive: false });
   look.addEventListener('touchmove', e => {
@@ -1532,13 +1634,36 @@ function initTouchControls() {
     }
     e.preventDefault();
   }, { passive: false });
-  const lookEnd = e => { for (const t of e.changedTouches) if (t.identifier === lookId) lookId = null; };
+  const lookEnd = e => { for (const t of e.changedTouches) if (t.identifier === lookId) { lookId = null; touchFiring = false; mouseDown = false; firedThisPress = false; } };
   look.addEventListener('touchend', lookEnd);
   look.addEventListener('touchcancel', lookEnd);
+
+  if (fire) {
+    const fireDown = e => { e.preventDefault(); fire.classList.add('held'); touchFiring = true; mouseDown = true; };
+    const fireUp = e => { e.preventDefault(); fire.classList.remove('held'); touchFiring = false; mouseDown = false; firedThisPress = false; };
+    fire.addEventListener('touchstart', fireDown, { passive: false });
+    fire.addEventListener('touchend', fireUp, { passive: false });
+    fire.addEventListener('touchcancel', fireUp, { passive: false });
+  }
+  if (ads) {
+    const adsDown = e => { e.preventDefault(); ads.classList.add('held'); mouse2Down = true; };
+    const adsUp = e => { e.preventDefault(); ads.classList.remove('held'); mouse2Down = false; };
+    ads.addEventListener('touchstart', adsDown, { passive: false });
+    ads.addEventListener('touchend', adsUp, { passive: false });
+    ads.addEventListener('touchcancel', adsUp, { passive: false });
+  }
+
+  const lookFirstTouch = e => { if (e.cancelable) e.preventDefault(); };
+  look.addEventListener('touchstart', lookFirstTouch, { passive: false });
+  document.addEventListener('gesturestart', e => { if (e.cancelable) e.preventDefault(); });
+  document.addEventListener('dblclick', e => { if (touchMode && e.cancelable) e.preventDefault(); });
+
+  initTouchWeaponBar();
 
   document.addEventListener('pointerlockchange', () => {
     if (touchMode && document.pointerLockElement === canvas) document.exitPointerLock();
   });
+  armTouchActivation();
 }
 
 showOverlay('start');
