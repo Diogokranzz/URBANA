@@ -1,8 +1,14 @@
-# URBANA
+<p align="center">
+  <img src="docs/banner.svg" alt="URBANA, FPS tático" width="100%">
+</p>
 
-Jogue agora no endereço público: https://diogokranzz.github.io/URBANA/
+<p align="center">
+  <a href="https://diogokranzz.github.io/URBANA/">▶ JOGAR AGORA NO ENDEREÇO OFICIAL</a>
+</p>
 
-FPS tático urbano em português do Brasil, feito com three.js puro e Node.js sem nenhuma dependência externa em tempo de execução. O jogo roda direto no navegador com ondas de IA armada, carros dirigíveis com turbo e fogo no escapamento, multijogador cooperativo por WebSocket e áudio sintetizado em tempo real, sem nenhum arquivo de som.
+FPS tático urbano em português do Brasil, feito com three.js puro e Node.js sem nenhuma dependência externa em tempo de execução. O jogo roda direto no navegador com ondas de IA armada, carros dirigíveis com turbo e fogo no escapamento, multiplayer cooperativo por WebSocket e áudio sintetizado em tempo real, sem nenhum arquivo de som.
+
+<img src="docs/divider.svg" width="100%">
 
 ## Visão geral do projeto
 
@@ -11,6 +17,8 @@ URBANA é um jogo de tiro em primeira pessoa ambientado em um cruzamento urbano 
 Todos os recursos do jogo são gerados por código: as texturas são desenhadas em canvas no carregamento, os sons são sintetizados com WebAudio e os bonecos são construídos por geometria procedural. Não existe download de assets externos, o que mantém o jogo leve, rápido de abrir e fácil de hospedar.
 
 O projeto segue a norma da língua portuguesa do Brasil em toda a interface, nos textos e no código, e não contém nenhum comentário em nenhum arquivo.
+
+<img src="docs/divider.svg" width="100%">
 
 ## Como executar
 
@@ -22,7 +30,9 @@ O projeto segue a norma da língua portuguesa do Brasil em toda a interface, nos
 
 O servidor escuta apenas em 127.0.0.1 por padrão, ou seja, ninguém fora da sua máquina acessa o jogo. Para liberar o acesso na rede local, use a variável de ambiente URBANA_HOST com o valor 0.0.0.0 antes do comando.
 
-A porta padrão é 8137 e o WebSocket do multijogador responde na rota /ws do mesmo endereço, sem depender de bibliotecas externas.
+A porta padrão é 8137 e o WebSocket do multiplayer responde na rota /ws do mesmo endereço, sem depender de bibliotecas externas.
+
+<img src="docs/divider.svg" width="100%">
 
 ## Controles
 
@@ -40,8 +50,10 @@ A porta padrão é 8137 e o WebSocket do multijogador responde na rota /ws do me
 12. E: entrar ou sair do carro mais próximo.
 13. V: câmera em terceira pessoa.
 14. TAB: placar.
-15. T: chat do multijogador.
+15. T: chat do multiplayer.
 16. ESC: pausar.
+
+<img src="docs/divider.svg" width="100%">
 
 ## O carro, o turbo e o escapamento
 
@@ -51,11 +63,15 @@ Segurando SHIFT com W pressionado o turbo entra em ação: os dois canos do esca
 
 Atropelar hostis em alta velocidade derruba os inimigos com ragdoll capotando, respingo de sangue, som de impacto na lataria e tremor de câmera, rendendo pontos de abate.
 
+<img src="docs/divider.svg" width="100%">
+
 ## Ondas de IA
 
 Os hostis chegam em ondas de dificuldade crescente, todos armados, com pontaria, visão, strafe, recarga, granadas e comportamento de cobertura. A IA desliza lateralmente em paredes, troca o lado do desvio quando fica presa e refaz o destino quando necessário, sem nenhum teleporte. Entre uma onda e outra existe um intervalo curto, o escudo do operador é recarregado e o placar soma bônus de limpeza da onda.
 
 Ao morrer aparece a deathcard K.I.A. com o dossiê da missão e o botão REIMPLANTAR, que devolve o jogador ao combate com vida, escudo e munição restaurados, mantendo a onda atual.
+
+<img src="docs/divider.svg" width="100%">
 
 ## Operadores
 
@@ -65,15 +81,19 @@ Ao morrer aparece a deathcard K.I.A. com o dossiê da missão e o botão REIMPLA
 
 A escolha muda a vida máxima, o escudo, a velocidade, o recuo e o material do boneco em terceira pessoa.
 
-## Multijogador cooperativo
+<img src="docs/divider.svg" width="100%">
+
+## Multiplayer cooperativo
 
 O servidor Node.js embutido roda uma sala cooperativa por WebSocket puro seguindo a norma RFC 6455, sem dependências. Jogadores remotos aparecem como bonecos completos com placas de nome, interpolação suave e caminhada procedural, os tiros remotos rendem tracers, clarão e áudio com pan espacial, e o chat fica na tecla T.
 
-A antifraude é inteiramente no servidor: limite de velocidade com correção de posição, limite de cadência de tiro por arma, limite de dano alegado, taxa de mensagens com token bucket, sanização de nomes, teto de conexões por IP e cabeçalhos de segurança como CSP, nosniff e bloqueio de frames. Nada é gravado em disco, as salas vivem apenas na memória.
+A antifraude é inteiramente no servidor: limite de velocidade com correção de posição, limite de cadência de tiro por arma, limite de dano alegado, taxa de mensagens com token bucket, sanitização de nomes, teto de conexões por IP e cabeçalhos de segurança como CSP, nosniff e bloqueio de frames. Nada é gravado em disco, as salas vivem apenas na memória.
+
+<img src="docs/divider.svg" width="100%">
 
 ## Arquitetura do código
 
-1. server.js: servidor estático endurecido com rate limit, bloqueio de dotfiles e resolução canônica de caminhos, além da sala multijogador com antifraude.
+1. server.js: servidor estático endurecido com rate limit, bloqueio de dotfiles e resolução canônica de caminhos, além da sala multiplayer com antifraude.
 2. src/main.js: loop principal, entrada, câmera, HUD, ondas, granadas, carro com turbo, atropelamento e telas de menu e morte.
 3. src/world.js: construção do mapa, texturas procedurais, iluminação, prédios, postes, carros e colisores.
 4. src/entities.js: fábrica de bonecos operadores, jogador e IA inimiga com ragdoll.
@@ -85,14 +105,26 @@ A antifraude é inteiramente no servidor: limite de velocidade com correção de
 10. index.html: telas, HUD, velocímetro e estilos.
 11. vendor/three.module.js: biblioteca three.js r160 vendada localmente, mantida intacta por ser código de terceiros.
 
+<img src="docs/divider.svg" width="100%">
+
 ## Publicação
 
 O jogo está publicado e sempre no ar no GitHub Pages, no endereço https://diogokranzz.github.io/URBANA/ , servido pelo branch de publicação deste repositório. Para atualizar o site basta enviar as alterações dos arquivos do jogo para esse branch.
 
 Nesse cenário estático o modo individual funciona por completo; o multiplayer exige um servidor Node.js ativo, então para manter o multiplayer no ar com salas e chat é preciso uma hospedagem que rode Node, como Render ou Railway, apontando o cliente para o mesmo endereço. Localmente, basta rodar node server.js e o multiplayer volta a funcionar na rede da sua máquina.
 
+<img src="docs/divider.svg" width="100%">
+
 ## Licença
 
-Projeto feito por Diogo Kranz. Todos os direitos estão reservados ao autor, que é o único detentor do projeto e de tudo que o compõe. É proibido copiar, reproduzir, redistribuir, vender, modificar ou criar obras derivadas, no todo ou em parte, sem autorização prévia e por escrito do autor. Quem quiser usar qualquer parte deste projeto precisa de permissão expressa de Diogo Kranz.
+<p align="center">
+  <a href="./LICENSE">
+    <img src="docs/license.svg" alt="Licença autoral de Diogo Kranz" width="520">
+  </a>
+</p>
+
+Projeto feito por Diogo Kranz. Todos os direitos estão reservados ao autor, que é o único detentor do projeto e de tudo que o compõe. É proibido copiar, reproduzir, redistribuir, vender, modificar ou criar obras derivadas, no todo ou em parte, sem autorização prévia e por escrito do autor.
+
+Quem quiser usar qualquer parte deste projeto precisa de permissão expressa de Diogo Kranz, e o texto completo da autorização e das restrições está no arquivo da [licença completa do projeto](./LICENSE).
 
 Todos os direitos reservados a Diogo Kranz.
