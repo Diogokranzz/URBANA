@@ -1,5 +1,7 @@
 # URBANA
 
+Jogue agora no endereço público: https://diogokranzz.github.io/URBANA/
+
 FPS tático urbano em português do Brasil, feito com three.js puro e Node.js sem nenhuma dependência externa em tempo de execução. O jogo roda direto no navegador com ondas de IA armada, carros dirigíveis com turbo e fogo no escapamento, multijogador cooperativo por WebSocket e áudio sintetizado em tempo real, sem nenhum arquivo de som.
 
 ## Visão geral do projeto
@@ -85,7 +87,9 @@ A antifraude é inteiramente no servidor: limite de velocidade com correção de
 
 ## Publicação
 
-O jogo é um site estático e pode ser publicado em hospedagens como a Vercel ou o GitHub Pages em poucos cliques. Nesse cenário o modo individual funciona por completo; o multijogador exige um servidor Node.js ativo, então para manter o multiplayer no ar é preciso uma hospedagem que rode Node, como Render ou Railway, apontando o cliente para o mesmo endereço.
+O jogo está publicado e sempre no ar no GitHub Pages, no endereço https://diogokranzz.github.io/URBANA/ , servido pelo branch gh-pages deste repositório. Para atualizar o site basta enviar as alterações dos arquivos do jogo para o branch gh-pages.
+
+Nesse cenário estático o modo individual funciona por completo; o multiplayer exige um servidor Node.js ativo, então para manter o multiplayer no ar com salas e chat é preciso uma hospedagem que rode Node, como Render ou Railway, apontando o cliente para o mesmo endereço. Localmente, basta rodar node server.js e o multiplayer volta a funcionar na rede da sua máquina.
 
 ## Licença
 
