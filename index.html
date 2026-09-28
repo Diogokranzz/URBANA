@@ -2,7 +2,20 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>URBANA</title>
+<title>URBANA: FPS Tático Urbano</title>
+<meta name="description" content="Jogo de tiro tático urbano em português, com ondas de IA, carros dirigíveis com turbo e multiplayer cooperativo. Jogue no navegador, de graça.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="URBANA: FPS Tático Urbano">
+<meta property="og:description" content="Ondas de IA, carros com turbo e fogo no escapamento, multiplayer cooperativo. Jogue no navegador.">
+<meta property="og:image" content="https://diogokranzz.github.io/URBANA/docs/og.png">
+<meta property="og:url" content="https://diogokranzz.github.io/URBANA/">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:site_name" content="URBANA">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="URBANA: FPS Tático Urbano">
+<meta name="twitter:description" content="Ondas de IA, carros com turbo e multiplayer cooperativo. Jogue no navegador.">
+<meta name="twitter:image" content="https://diogokranzz.github.io/URBANA/docs/og.png">
+<meta name="theme-color" content="#e8c35a">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="shortcut icon" type="image/svg+xml" href="favicon.svg">
 <link rel="apple-touch-icon" href="favicon.svg">
@@ -390,6 +403,10 @@
     user-select: none; pointer-events: none;
   }
   .screen .sub { font-size: 14px; letter-spacing: 4px; color: #8fa8b8; margin-bottom: 28px; }
+  #record-line {
+    font-size: 13px; letter-spacing: 3px; color: #ffd24a; margin-bottom: 14px;
+    text-shadow: 0 0 12px rgba(232,195,90,0.35), 0 1px 2px #000;
+  }
   #screen-start .logo { margin-bottom: 34px; }
   .screen h1 { font-size: 34px; letter-spacing: 10px; font-weight: 300; color: #e8eef2; }
 
@@ -616,6 +633,7 @@
 
     <div id="screen-start" class="screen">
       <img src="logo.svg" alt="URBANA" class="logo">
+      <div id="record-line" class="hidden"></div>
       <div id="controls3d">
         <div class="row" data-key="KeyW,KeyA,KeyS,KeyD"><span class="cap">W A S D</span><span class="desc">Mover</span></div>
         <div class="row" data-key="Mouse0,Mouse2"><span class="cap">MOUSE</span><span class="desc">Mirar</span></div>

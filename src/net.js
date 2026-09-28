@@ -16,6 +16,13 @@ export class Net {
   }
 
   get url() {
+    let custom = '';
+    try { custom = localStorage.getItem('urbana-server') || ''; } catch {}
+    if (custom) {
+      if (custom.startsWith('ws://') || custom.startsWith('wss://')) return custom;
+      const secure = location.protocol === 'https:' ? 'wss://' : 'ws://';
+      return secure + custom + '/ws';
+    }
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     return proto + '//' + location.host + '/ws';
   }

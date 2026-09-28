@@ -28,9 +28,9 @@ O projeto segue a norma da língua portuguesa do Brasil em toda a interface, nos
 2. Execute o comando: node server.js
 3. Abra o endereço: localhost na porta 8137 no navegador, com o protocolo http.
 
-O servidor escuta apenas em 127.0.0.1 por padrão, ou seja, ninguém fora da sua máquina acessa o jogo. Para liberar o acesso na rede local, use a variável de ambiente URBANA_HOST com o valor 0.0.0.0 antes do comando.
+O servidor escuta apenas em 127.0.0.1 por padrão, ou seja, ninguém fora da sua máquina acessa o jogo. Para liberar o acesso na rede local, use a variável de ambiente URBANA_HOST com o valor 0.0.0.0 antes do comando, e em hospedagens de nuvem a porta é lida automaticamente da variável de ambiente PORT, que serviços como Render e Railway definem sozinhos.
 
-A porta padrão é 8137 e o WebSocket do multiplayer responde na rota /ws do mesmo endereço, sem depender de bibliotecas externas.
+A porta padrão é 8137 e o WebSocket do multiplayer responde na rota /ws do mesmo endereço, sem depender de bibliotecas externas. Se o jogo estiver publicado em um site estático e o servidor do multiplayer rodar em outro endereço, basta definir a chave urbana-server no armazenamento local do navegador apontando para o endereço do servidor.
 
 <img src="docs/divider.svg" width="100%">
 
@@ -89,6 +89,8 @@ O servidor Node.js embutido roda uma sala cooperativa por WebSocket puro seguind
 
 A antifraude é inteiramente no servidor: limite de velocidade com correção de posição, limite de cadência de tiro por arma, limite de dano alegado, taxa de mensagens com token bucket, sanitização de nomes, teto de conexões por IP e cabeçalhos de segurança como CSP, nosniff e bloqueio de frames. Nada é gravado em disco, as salas vivem apenas na memória.
 
+O recorde pessoal do jogador fica salvo no próprio navegador: a melhor pontuação, a maior onda e o total de abates aparecem em dourado no menu inicial, prontos para serem batidos.
+
 <img src="docs/divider.svg" width="100%">
 
 ## Arquitetura do código
@@ -109,9 +111,11 @@ A antifraude é inteiramente no servidor: limite de velocidade com correção de
 
 ## Publicação
 
-O jogo está publicado e sempre no ar no GitHub Pages, no endereço https://diogokranzz.github.io/URBANA/ , servido pelo branch de publicação deste repositório. Para atualizar o site basta enviar as alterações dos arquivos do jogo para esse branch.
+O jogo está publicado e sempre no ar no GitHub Pages, no endereço https://diogokranzz.github.io/URBANA/ , servido pelo branch de publicação deste repositório.
 
-Nesse cenário estático o modo individual funciona por completo; o multiplayer exige um servidor Node.js ativo, então para manter o multiplayer no ar com salas e chat é preciso uma hospedagem que rode Node, como Render ou Railway, apontando o cliente para o mesmo endereço. Localmente, basta rodar node server.js e o multiplayer volta a funcionar na rede da sua máquina.
+A publicação é automática: a cada envio para o branch principal, o GitHub Actions valida todos os arquivos JavaScript e republica o site sozinho, sem nenhum passo manual. O site também carrega capa de compartilhamento, título e descrição, então o link aparece bonito e com imagem de preview no WhatsApp, no Discord e em redes sociais.
+
+Nesse cenário estático o modo individual funciona por completo; o multiplayer exige um servidor Node.js ativo, então para manter o multiplayer no ar com salas e chat é preciso uma hospedagem que rode Node, como Render ou Railway. O projeto já está pronto para isso: o comando de start é node server.js, a porta vem da variável de ambiente PORT e o host liberado vem de URBANA_HOST. Localmente, basta rodar node server.js e o multiplayer volta a funcionar na rede da sua máquina.
 
 <img src="docs/divider.svg" width="100%">
 

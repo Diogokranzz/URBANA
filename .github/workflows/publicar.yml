@@ -1,0 +1,54 @@
+name: Publica o URBANA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Valida os arquivos JavaScript
+        run: |
+          for f in src/*.js server.js remote-player-test.js; do
+            node --check "$f"
+          done
+
+      - name: Verifica se o jogo abre sem erros de módulo
+        run: |
+          node -e "
+            const fs = require('fs');
+            const html = fs.readFileSync('index.html', 'utf8');
+            if (!html.includes('src/main.js')) throw new Error('index.html sem o script principal');
+            for (const imp of [...html.matchAll(/src=\"([^\"]+\.js)\"/g)].map(m => m[1])) {
+              if (!fs.existsSync(imp)) throw new Error('arquivo ausente: ' + imp);
+            }
+          "
+
+      - name: Publica o site no branch de publicação
+        run: |
+          git config user.name "Diogo Kranz"
+          git config user.email "Diogokranzz@users.noreply.github.com"
+          git fetch origin gh-pages 2>/dev/null || true
+          git checkout gh-pages 2>/dev/null || git checkout --orphan gh-pages
+          git rm -rqf . 2>/dev/null || true
+          git checkout main -- index.html logo.svg favicon.svg src vendor docs
+          touch .nojekyll
+          printf '*.log\n' > .gitignore
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Site sem mudanças, nada para publicar."
+          else
+            git commit -qm "Publica o site a partir do main"
+            git push -f origin gh-pages
+          fi

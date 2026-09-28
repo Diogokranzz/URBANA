@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const root = __dirname;
-const PORT = 8137;
+const PORT = process.env.PORT || 8137;
 
 const types = {
   '.html': 'text/html; charset=utf-8',
@@ -93,11 +93,11 @@ const server = http.createServer((req, res) => {
   });
 });
 server.on('upgrade', handleUpgrade);
-server.listen(PORT, process.env.URBANA_HOST || '127.0.0.1', () => {
-  const host = process.env.URBANA_HOST || '127.0.0.1';
-  console.log(`URBANA rodando em http://${host === '0.0.0.0' ? '<ip-local>' : host}:${PORT}`);
+const HOST = process.env.URBANA_HOST || (process.env.PORT ? '0.0.0.0' : '127.0.0.1');
+server.listen(PORT, HOST, () => {
+  console.log(`URBANA rodando em http://${HOST === '0.0.0.0' ? '<ip-local>' : HOST}:${PORT}`);
   console.log('Multiplayer: WebSocket em ws://<host>:' + PORT + '/ws');
-  if (host === '127.0.0.1') console.log('Servidor local apenas — nenhum dado sai desta máquina.');
+  if (HOST === '127.0.0.1') console.log('Servidor local apenas, nenhum dado sai desta máquina.');
 });
 
 const crypto = require('crypto');

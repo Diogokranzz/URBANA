@@ -266,6 +266,30 @@ function setChip(el, val) {
   el.classList.add('bump');
 }
 
+function loadRecord() {
+  try { return JSON.parse(localStorage.getItem('urbana-record') || 'null'); } catch { return null; }
+}
+
+function saveRecordIfNeeded() {
+  try {
+    const r = loadRecord() || { score: 0, wave: 0, kills: 0 };
+    if (state.score > (r.score || 0)) {
+      r.score = state.score; r.wave = state.wave; r.kills = state.kills;
+      localStorage.setItem('urbana-record', JSON.stringify(r));
+    }
+  } catch {}
+}
+
+function showRecordLine() {
+  const el = document.getElementById('record-line');
+  if (!el) return;
+  const r = loadRecord();
+  if (r && r.score > 0) {
+    el.textContent = `RECORDE: ${r.score} PONTOS · ONDA ${r.wave} · ${r.kills} ABATES`;
+    el.classList.remove('hidden');
+  }
+}
+
 function updHud() {
   const hp = Math.round(player.health);
   hud.health.textContent = hp;
@@ -1063,6 +1087,7 @@ function update(dt) {
   if (!player.alive && !state.over) {
     state.over = true;
     state.deaths = (state.deaths || 0) + 1;
+    saveRecordIfNeeded();
     state.deathT = 0;
     document.exitPointerLock();
     net.disconnect();
@@ -1395,6 +1420,7 @@ window.__fpsDebug = {
 };
 
 showOverlay('start');
+showRecordLine();
 requestAnimationFrame(frame);
 
 setInterval(() => {
