@@ -1,4 +1,4 @@
-const CACHE = 'urbana.v2';
+const CACHE = 'urbana.v3';
 const ESSENCIAIS = [
   './',
   'index.html',

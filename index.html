@@ -457,6 +457,46 @@
     display: flex; align-items: center; justify-content: center;
   }
   .screen { text-align: center; color: #e8eef2; max-width: 640px; padding: 20px; }
+  #overlay { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px 0; }
+  #overlay .screen { max-height: none; margin: 0 auto; }
+
+  @media (max-width: 760px), (max-height: 620px) {
+    .screen { padding: 12px 10px; }
+    .screen h1 { font-size: 21px; letter-spacing: 5px; }
+    .screen .sub { font-size: 11px; letter-spacing: 2px; margin-bottom: 12px; }
+    #screen-start .logo { margin-bottom: 10px; width: min(300px, 72%); }
+    #controls3d { margin-bottom: 10px; }
+    #controls3d .row { gap: 8px; }
+    #controls3d .cap { min-width: 86px; font-size: 10.5px; padding: 4px 7px 3px; border-radius: 5px; box-shadow: 0 2px 0 #0a0d10, 0 3px 5px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.09); }
+    #controls3d .row .desc { font-size: 11px; }
+    .btn { font-size: 14px; letter-spacing: 2px; padding: 11px 30px; }
+    #quality { position: static; margin: 14px auto 0; justify-content: center; width: fit-content; padding: 6px 10px; }
+    #quality button { font-size: 10px; letter-spacing: 1.5px; padding: 5px 10px; }
+    #screen-select { max-width: 96vw; }
+    #op-canvas { width: 170px; height: 193px; margin: 0 auto 6px; }
+    #op-name { font-size: 18px; letter-spacing: 5px; }
+    #op-desc { font-size: 11px; margin-bottom: 8px; }
+    .op-cards { flex-direction: row; gap: 6px; margin-bottom: 10px; padding: 0 2px; }
+    .op-card { width: 30%; min-width: 0; padding: 8px 4px 8px; }
+    .op-card .op-icon { font-size: 17px; margin-bottom: 3px; }
+    .op-card .op-cname { font-size: 10px; letter-spacing: 1px; }
+    .op-card .op-role { font-size: 8.5px; letter-spacing: 0.4px; margin-top: 3px; line-height: 1.35; }
+    .note { margin-top: 8px; font-size: 10px; }
+    .dc-frame { padding: 20px 18px 16px; }
+    .stats { font-size: 15px; margin-bottom: 14px; line-height: 1.7; }
+  }
+
+  @media (max-width: 760px) {
+    #top-center { transform: translateX(-50%) scale(0.8); transform-origin: top center; top: 8px; }
+    #bottom-left { transform: scale(0.85); transform-origin: left bottom; left: 12px; bottom: 12px; }
+    #bottom-right { transform: scale(0.85); transform-origin: right bottom; right: 12px; bottom: 12px; }
+    #killfeed { max-width: 62vw; }
+  }
+
+  @media (max-width: 760px) and (orientation: landscape) {
+    #op-canvas { display: none; }
+    #controls3d { max-height: 42vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  }
   .screen .logo {
     width: min(420px, 86%);
     margin-bottom: 10px;
@@ -680,20 +720,6 @@
       <div class="sp-value"><span id="sp-kmh">0</span><span class="sp-unit">KM/H</span></div>
       <div class="sp-bar"><div id="sp-fill"></div></div>
       <div class="sp-gear"><span id="sp-gear">N</span><span class="sp-label">MARCHA</span></div>
-    </div>
-
-    <div id="touch-ui">
-      <div id="touch-look"></div>
-      <div id="touch-stick"><div id="touch-knob"></div></div>
-      <div class="tbtn" data-k="KeyW" style="right:20px; bottom:190px; width:64px; height:64px;">ACELERA</div>
-      <div class="tbtn" data-k="KeyS" style="right:20px; bottom:120px; width:56px; height:56px;">RÉ</div>
-      <div class="tbtn" data-k="ShiftLeft" style="right:96px; bottom:206px; width:58px; height:58px;">TURBO</div>
-      <div class="tbtn" data-k="KeyE" style="right:96px; bottom:140px; width:50px; height:50px;">CARRO</div>
-      <div class="tbtn" data-k="Space" style="left:180px; bottom:60px; width:60px; height:60px;">PULAR</div>
-      <div class="tbtn" data-k="KeyR" style="left:180px; bottom:128px; width:52px; height:52px;">RECARGA</div>
-      <div class="tbtn" data-k="KeyG" style="left:174px; bottom:196px; width:52px; height:52px;">GRANADA</div>
-      <div class="tbtn" data-k="KeyV" style="left:20px; top:80px; width:50px; height:50px;">CAM</div>
-      <div class="tbtn" data-k="KeyQ" style="left:80px; top:80px; width:50px; height:50px;">ARSENAL</div>
     </div>
 
     <div id="lowhp"></div>

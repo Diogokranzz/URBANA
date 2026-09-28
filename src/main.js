@@ -106,6 +106,7 @@ function adjustSens(delta) {
 }
 
 let chatOpen = false;
+let touchMode = false;
 function openChat() {
   chatOpen = true;
   const inp = document.getElementById('chat-input');
@@ -175,6 +176,7 @@ addEventListener('mousemove', e => {
 });
 document.addEventListener('pointerlockchange', () => {
   pointerLocked = document.pointerLockElement === canvas;
+  if (touchMode) return;
   if (!pointerLocked && state.running && !state.over && !chatOpen) {
     state.paused = true;
     showOverlay('pause');
@@ -214,6 +216,8 @@ function showOverlay(kind) {
   $('screen-select').classList.toggle('hidden', kind !== 'select');
   $('screen-pause').classList.toggle('hidden', kind !== 'pause');
   $('screen-over').classList.toggle('hidden', kind !== 'over');
+  const tui = document.getElementById('touch-ui');
+  if (tui) tui.style.display = 'none';
   if (kind === 'over') showDeathScreen();
 }
 
@@ -247,7 +251,11 @@ function initDeathcardTilt() {
     }
   });
 }
-function hideOverlay() { $('overlay').classList.add('hidden'); }
+function hideOverlay() {
+  $('overlay').classList.add('hidden');
+  const tui = document.getElementById('touch-ui');
+  if (tui && touchMode) tui.style.display = '';
+}
 
 function killFeed(text, color) {
   const div = document.createElement('div');
@@ -894,7 +902,8 @@ function frame(nowT) {
   const dt = Math.min(0.05, (nowT - lastT) / 1000);
   lastT = nowT;
   if (!state.running) { menuCamera(nowT); renderOperatorSelect(Math.min(0.05, dt)); render(); return; }
-  if (state.paused || state.over) { render(); return; }
+  if (state.paused && !touchMode) { render(); return; }
+  if (state.over) { render(); return; }
 
   state.time += dt;
   update(dt);
@@ -1360,6 +1369,7 @@ $('btn-start').addEventListener('click', () => {
   audio.uiConfirm();
   $('screen-start').classList.add('hidden');
   $('screen-select').classList.remove('hidden');
+  document.getElementById('overlay').scrollTop = 0;
   if (!opRenderer) initOperatorSelect();
 });
 
@@ -1368,13 +1378,13 @@ $('btn-deploy').addEventListener('click', () => {
   applyOperator();
   hideOverlay();
   state.running = true;
-  lockPointer();
+  if (!touchMode) lockPointer();
 });
 document.querySelectorAll('.op-card').forEach((c, i) => c.addEventListener('click', () => selectOperator(i)));
 $('btn-resume').addEventListener('click', () => {
   state.paused = false;
   hideOverlay();
-  lockPointer();
+  if (!touchMode) lockPointer();
 });
 $('btn-restart').addEventListener('click', () => {
   audio.uiConfirm();
@@ -1456,10 +1466,8 @@ window.__fpsDebug = {
   get avatar() { return playerAvatar; },
 };
 
-let touchMode = false;
-
 function initTouchControls() {
-  const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || (window.matchMedia && matchMedia('(pointer: coarse)').matches);
   const ui = document.getElementById('touch-ui');
   if (!isTouch || !ui) return;
   touchMode = true;
