@@ -87,7 +87,7 @@ A antifraude é inteiramente no servidor: limite de velocidade com correção de
 
 ## Publicação
 
-O jogo está publicado e sempre no ar no GitHub Pages, no endereço https://diogokranzz.github.io/URBANA/ , servido pelo branch gh-pages deste repositório. Para atualizar o site basta enviar as alterações dos arquivos do jogo para o branch gh-pages.
+O jogo está publicado e sempre no ar no GitHub Pages, no endereço https://diogokranzz.github.io/URBANA/ , servido pelo branch de publicação deste repositório. Para atualizar o site basta enviar as alterações dos arquivos do jogo para esse branch.
 
 Nesse cenário estático o modo individual funciona por completo; o multiplayer exige um servidor Node.js ativo, então para manter o multiplayer no ar com salas e chat é preciso uma hospedagem que rode Node, como Render ou Railway, apontando o cliente para o mesmo endereço. Localmente, basta rodar node server.js e o multiplayer volta a funcionar na rede da sua máquina.
 
