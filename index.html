@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>URBANA</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="shortcut icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="favicon.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+  body { font-family: 'Segoe UI', 'Roboto', sans-serif; cursor: default; user-select: none; }
+  #game { position: fixed; inset: 0; }
+  #game canvas { display: block; }
+
+  .hidden { display: none !important; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+
+  /* crosshair dinâmico */
+  #crosshair {
+    --gap: 10px;
+    position: absolute; left: 50%; top: 50%;
+    width: 0; height: 0;
+  }
+  #crosshair .l {
+    position: absolute; background: rgba(255,255,255,0.85);
+    box-shadow: 0 0 3px rgba(0,0,0,0.9);
+  }
+  #crosshair .t { width: 2px; height: 8px; left: -1px; top: calc(-1 * var(--gap) - 8px); }
+  #crosshair .b { width: 2px; height: 8px; left: -1px; top: var(--gap); }
+  #crosshair .lf { width: 8px; height: 2px; top: -1px; left: calc(-1 * var(--gap) - 8px); }
+  #crosshair .rt { width: 8px; height: 2px; top: -1px; left: var(--gap); }
+  #crosshair .dot { position: absolute; width: 2px; height: 2px; left: -1px; top: -1px; background: rgba(255,255,255,0.9); }
+
+  #hitmarker {
+    position: absolute; left: 50%; top: 50%; width: 22px; height: 22px;
+    transform: translate(-50%, -50%) rotate(45deg);
+    opacity: 0; transition: opacity 0.12s;
+  }
+  #hitmarker::before, #hitmarker::after {
+    content: ''; position: absolute; background: #fff;
+    box-shadow: 0 0 4px rgba(0,0,0,0.8);
+  }
+  #hitmarker::before { left: 50%; top: 0; width: 2px; height: 100%; margin-left: -1px; }
+  #hitmarker::after { top: 50%; left: 0; height: 2px; width: 100%; margin-top: -1px; }
+
+  /* canto inferior esquerdo: vida */
+  #bottom-left {
+    position: absolute; left: 26px; bottom: 24px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  #health {
+    font-size: 34px; font-weight: 700; color: #fff;
+    text-shadow: 0 0 6px rgba(0,0,0,0.8); min-width: 64px;
+    font-variant-numeric: tabular-nums;
+  }
+  #health-bar-wrap {
+    width: 210px; height: 9px; background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(255,255,255,0.25); border-radius: 2px; overflow: hidden;
+  }
+  #health-bar { height: 100%; width: 100%; background: #6fbf73; transition: width 0.25s; }
+  #shield-bar-wrap {
+    width: 210px; height: 7px; background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(255,255,255,0.22); border-radius: 2px; overflow: hidden;
+    margin-top: 5px;
+  }
+  #shield-bar {
+    height: 100%; width: 100%; transition: width 0.2s;
+    background: linear-gradient(90deg, #3fa8c9, #7fd8f0);
+    box-shadow: 0 0 8px rgba(110,200,235,0.55);
+  }
+  #shield-bar.empty { opacity: 0.25; box-shadow: none; }
+
+  /* ---------- painel de loadout (Q) ---------- */
+  #loadout {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    min-width: 560px; padding: 24px 34px 20px;
+    background: linear-gradient(165deg, rgba(18,23,28,0.96), rgba(7,10,13,0.97));
+    border: 1px solid rgba(255,255,255,0.14);
+    border-top: 3px solid #e8c35a;
+    border-radius: 10px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.07);
+    color: #e8eef2;
+    animation: loIn 0.28s cubic-bezier(0.16,1,0.3,1);
+  }
+  @keyframes loIn { from { opacity: 0; transform: translate(-50%, -47%) scale(0.95); } }
+  #loadout h2 { font-size: 14px; letter-spacing: 6px; color: #e8c35a; margin-bottom: 16px; }
+  #loadout .lo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 26px; }
+  .lo-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 7px 10px; border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.07);
+    background: rgba(255,255,255,0.03);
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .lo-row.active {
+    border-color: rgba(232,195,90,0.65);
+    background: rgba(232,195,90,0.08);
+    box-shadow: inset 0 0 18px rgba(232,195,90,0.07);
+  }
+  .lo-key {
+    min-width: 34px; text-align: center; font-family: monospace; font-weight: 700;
+    font-size: 13px; color: #0f1215;
+    background: linear-gradient(180deg, #e8e2d2, #b9b2a0);
+    border-radius: 4px; padding: 3px 7px;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.55);
+  }
+  .lo-name { flex: 1; font-size: 14px; letter-spacing: 1.5px; }
+  .lo-ammo { font-size: 12px; color: #9fb2bd; font-variant-numeric: tabular-nums; }
+  .lo-state { font-size: 12px; letter-spacing: 1px; }
+  .lo-state.on { color: #7ec97e; } .lo-state.off { color: #c9764a; }
+  .lo-foot { margin-top: 14px; font-size: 11px; color: #6d7d88; letter-spacing: 2px; text-align: center; }
+
+  /* ---------- seleção de operador ---------- */
+  #screen-select { max-width: 860px; }
+  #op-canvas {
+    display: block; width: 300px; height: 340px; margin: 4px auto 10px;
+    filter: drop-shadow(0 18px 30px rgba(0,0,0,0.6));
+  }
+  #op-name { font-size: 24px; letter-spacing: 8px; color: #e8c35a; margin-bottom: 2px; }
+  #op-desc { font-size: 13px; letter-spacing: 2px; color: #8fa8b8; margin-bottom: 18px; }
+  .op-cards { display: flex; gap: 14px; justify-content: center; margin-bottom: 24px; }
+  .op-card {
+    width: 190px; padding: 14px 12px 12px;
+    background: linear-gradient(180deg, rgba(26,32,38,0.9), rgba(12,15,18,0.94));
+    border: 1px solid rgba(255,255,255,0.13);
+    border-radius: 8px; cursor: pointer;
+    transition: transform 0.16s, border-color 0.16s, box-shadow 0.16s;
+  }
+  .op-card:hover { transform: translateY(-3px); border-color: rgba(232,195,90,0.45); }
+  .op-card.sel {
+    border-color: #e8c35a;
+    box-shadow: 0 0 0 1px #e8c35a, 0 10px 30px rgba(232,195,90,0.18);
+  }
+  .op-card .op-icon { font-size: 24px; margin-bottom: 6px; }
+  .op-card .op-cname { font-size: 14px; font-weight: 700; letter-spacing: 2.5px; color: #f2f5f7; }
+  .op-card .op-role { font-size: 10.5px; letter-spacing: 1.5px; color: #8fa8b8; margin-top: 4px; line-height: 1.5; }
+  #screen-select .btn { margin-top: 4px; }
+
+  /* canto inferior direito: munição */
+  #bottom-right {
+    position: absolute; right: 26px; bottom: 24px; text-align: right;
+  }
+  #ammo {
+    font-size: 38px; font-weight: 700; color: #fff;
+    text-shadow: 0 0 6px rgba(0,0,0,0.85); font-variant-numeric: tabular-nums;
+  }
+  #weapon { font-size: 14px; letter-spacing: 3px; color: #cfd8dc; text-shadow: 0 1px 3px #000; margin-top: -2px; }
+  #grenade-cd { font-size: 12px; color: #ffd24a; height: 14px; }
+  #reload-hint { font-size: 13px; color: #ffd24a; letter-spacing: 2px; opacity: 0; transition: opacity 0.2s; }
+
+  /* chat multiplayer */
+  #chat-input {
+    position: absolute; left: 20px; bottom: 90px; width: 320px;
+    background: rgba(6,9,12,0.9); border: 1px solid rgba(232,195,90,0.5);
+    border-radius: 4px; padding: 8px 10px;
+    color: #e8eef2; font-size: 14px; letter-spacing: 0.5px; outline: none;
+  }
+
+  /* ---------- placar superior animado (chips de vidro estilo esports) ---------- */
+  #top-center {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 10px; align-items: stretch; pointer-events: none;
+  }
+  .chip {
+    position: relative; overflow: hidden;
+    min-width: 106px; padding: 7px 20px 8px; text-align: center;
+    background: linear-gradient(180deg, rgba(20,26,31,0.82), rgba(8,11,14,0.9));
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 9px;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
+    backdrop-filter: blur(6px);
+    animation: chipIn 0.7s cubic-bezier(0.16,1,0.3,1) backwards;
+  }
+  .chip:nth-child(2) { animation-delay: 0.12s; }
+  .chip:nth-child(3) { animation-delay: 0.24s; }
+  @keyframes chipIn { from { opacity: 0; transform: translateY(-26px) scale(0.9); } to { opacity: 1; transform: none; } }
+  /* varredura de brilho periódica (sheen) */
+  .chip::after {
+    content: ''; position: absolute; top: 0; left: -80%; width: 60%; height: 100%;
+    background: linear-gradient(105deg, transparent, rgba(255,255,255,0.14), transparent);
+    transform: skewX(-18deg);
+    animation: sheen 5.5s ease-in-out infinite;
+  }
+  .chip:nth-child(2)::after { animation-delay: 0.7s; }
+  .chip:nth-child(3)::after { animation-delay: 1.4s; }
+  @keyframes sheen { 0%, 72% { left: -80%; } 88%, 100% { left: 130%; } }
+  .chip-label {
+    display: block; font-size: 10px; letter-spacing: 4px; color: #8fa8b8;
+    text-shadow: 0 1px 2px #000; margin-bottom: 1px;
+  }
+  .chip-value {
+    display: block; font-size: 27px; font-weight: 800; line-height: 1.05;
+    color: #f2f5f7; font-variant-numeric: tabular-nums;
+    text-shadow: 0 2px 4px #000;
+  }
+  .chip-wave { border-top: 2px solid rgba(232,195,90,0.75); }
+  .chip-wave .chip-value { color: #ffd24a; text-shadow: 0 0 18px rgba(232,195,90,0.4), 0 2px 4px #000; }
+  .chip-hostiles { border-top: 2px solid rgba(255,75,56,0.7); }
+  .chip-hostiles .chip-value { color: #ff6b57; }
+  .chip-hostiles.hot .chip-value { animation: hostPulse 1.15s ease-in-out infinite; }
+  @keyframes hostPulse {
+    0%, 100% { text-shadow: 0 0 6px rgba(255,75,56,0.25), 0 2px 4px #000; }
+    50%      { text-shadow: 0 0 22px rgba(255,75,56,0.9), 0 2px 4px #000; }
+  }
+  .chip-online { border-top: 2px solid rgba(143,188,217,0.7); }
+  .chip-online .chip-value { color: #8fbcd9; }
+  .chip-online.live::after { content: ''; }
+  .chip-score { border-top: 2px solid rgba(126,201,126,0.7); }
+  .chip-score .chip-value {
+    background: linear-gradient(180deg, #ffe9a8, #e8c35a 55%, #b98a2e);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.7));
+  }
+  /* pop do dígito quando o valor muda */
+  .chip-value.bump { animation: bump 0.38s cubic-bezier(0.2, 1.6, 0.4, 1); }
+  @keyframes bump {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.42) translateY(-2px); }
+    100% { transform: scale(1); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chip, .chip::after, .chip-hostiles.hot .chip-value, .chip-value.bump { animation: none !important; }
+  }
+
+  /* minimapa */
+  #minimap-wrap {
+    position: absolute; top: 20px; right: 20px;
+    border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+  }
+  #minimap { display: block; }
+
+  /* kill feed */
+  #killfeed {
+    position: absolute; top: 20px; left: 20px;
+    display: flex; flex-direction: column; gap: 4px; max-width: 420px;
+  }
+  .feed-item {
+    background: rgba(0,0,0,0.45); padding: 4px 10px; border-radius: 3px;
+    font-size: 13px; color: #ddd; letter-spacing: 0.5px;
+    animation: feedin 0.2s ease-out;
+  }
+  @keyframes feedin { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; } }
+
+  /* banner 3D de eliminação */
+  #killbanner {
+    position: absolute; left: 50%; top: 34%;
+    display: flex; align-items: center; gap: 14px;
+    padding: 10px 28px 10px 16px;
+    background: linear-gradient(180deg, rgba(26,30,35,0.94), rgba(10,12,15,0.94));
+    border: 1px solid rgba(232,195,90,0.55);
+    border-left: 4px solid #e8c35a;
+    border-radius: 4px;
+    box-shadow: 0 12px 34px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.1);
+    opacity: 0; pointer-events: none;
+    transform: translate(-50%, -50%);
+  }
+  #killbanner .kb-icon { width: 44px; height: 44px; color: #e8c35a; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.7)); }
+  #killbanner .kb-title {
+    font-size: 21px; font-weight: 800; letter-spacing: 5px; color: #f2f5f7;
+    text-shadow: 0 0 14px rgba(232,195,90,0.35), 0 2px 3px rgba(0,0,0,0.8);
+  }
+  #killbanner .kb-sub { font-size: 13px; letter-spacing: 3px; color: #ffd24a; margin-top: 2px; }
+  /* variante headshot */
+  #killbanner.head { border-left-color: #ff4b38; box-shadow: 0 12px 34px rgba(120,10,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1); }
+  #killbanner.head .kb-icon { color: #ff4b38; }
+  #killbanner.head .kb-title { color: #ffd24a; text-shadow: 0 0 16px rgba(255,75,56,0.5), 0 2px 3px rgba(0,0,0,0.8); }
+  /* overlay da luneta do sniper */
+  #scope-overlay {
+    position: absolute; inset: 0;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.12s;
+    background: radial-gradient(circle at center, transparent 29.5%, rgba(2,3,4,0.98) 30.5%);
+  }
+  #scope-overlay::before {  /* retícula: cruz fina mil-dot */
+    content: ''; position: absolute; left: 50%; top: 0; width: 1.5px; height: 100%;
+    transform: translateX(-50%);
+    background: rgba(10,10,10,0.9);
+    box-shadow: 0 0 1px rgba(0,0,0,0.8);
+  }
+  #scope-overlay::after {
+    content: ''; position: absolute; top: 50%; left: 0; height: 1.5px; width: 100%;
+    transform: translateY(-50%);
+    background: rgba(10,10,10,0.9);
+  }
+  #scope-ring {
+    position: absolute; left: 50%; top: 50%; width: 60vmin; height: 60vmin;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 14px solid #050607;
+    box-shadow: inset 0 0 60px rgba(0,0,0,0.85), 0 0 40px rgba(0,0,0,0.6);
+  }
+  #scope-dot {
+    position: absolute; left: 50%; top: 50%; width: 4px; height: 4px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%; background: #1a1a1a;
+    box-shadow: 0 0 3px rgba(0,0,0,0.9);
+  }
+  #scope-overlay.on { opacity: 1; }
+
+  /* placar TAB */
+  #scoreboard {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    min-width: 440px;
+    animation: sbIn 0.35s cubic-bezier(0.16,1,0.3,1);
+    background: linear-gradient(180deg, rgba(16,20,24,0.96), rgba(8,10,12,0.96));
+    border: 1px solid rgba(255,255,255,0.16);
+    border-top: 3px solid #e8c35a;
+    border-radius: 6px;
+    padding: 22px 30px 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+    color: #e8eef2;
+  }
+  #scoreboard h2 { font-size: 15px; letter-spacing: 5px; font-weight: 700; color: #e8c35a; margin-bottom: 14px; }
+  #scoreboard table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  #scoreboard th {
+    text-align: left; font-size: 11px; letter-spacing: 2px; color: #8fa8b8;
+    border-bottom: 1px solid rgba(255,255,255,0.14); padding: 4px 8px 8px;
+  }
+  #scoreboard td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); letter-spacing: 1px; }
+  #scoreboard tr.me td { color: #7ec97e; font-weight: 700; }
+  #scoreboard tr.hostiles td { color: #ff6b57; }
+  #scoreboard .num { text-align: right; font-variant-numeric: tabular-nums; }
+  #scoreboard .hint { margin-top: 12px; font-size: 11px; color: #6d7d88; letter-spacing: 2px; text-align: center; }
+  @keyframes sbIn { from { opacity: 0; transform: translate(-50%, -46%) scale(0.94); } }
+  @media (prefers-reduced-motion: reduce) { #scoreboard { animation: none; } }
+
+  #killbanner.show { animation: kbpop 1.7s cubic-bezier(0.2, 0.9, 0.3, 1) forwards; }
+  @keyframes kbpop {
+    0%   { opacity: 0; transform: translate(-50%, -50%) perspective(650px) rotateX(42deg) scale(0.6); }
+    14%  { opacity: 1; transform: translate(-50%, -50%) perspective(650px) rotateX(0deg) scale(1.07); }
+    24%  { transform: translate(-50%, -50%) perspective(650px) scale(1); }
+    80%  { opacity: 1; transform: translate(-50%, -50%) perspective(650px) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -54%) perspective(650px) scale(0.97); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #killbanner.show { animation: kbflat 1.7s ease forwards; }
+    @keyframes kbflat { 0% { opacity: 0; } 12% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+  }
+
+  /* ---------- velocímetro (dirigindo) ---------- */
+  #speedo {
+    position: absolute; right: 26px; bottom: 88px;
+    display: flex; align-items: center; gap: 16px;
+    padding: 10px 18px 12px;
+    background: linear-gradient(180deg, rgba(20,26,31,0.82), rgba(8,11,14,0.9));
+    border: 1px solid rgba(255,255,255,0.12);
+    border-top: 2px solid rgba(83,200,232,0.7);
+    border-radius: 9px;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
+    backdrop-filter: blur(6px);
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  #speedo.hidden { display: flex !important; opacity: 0; transform: translateY(8px); pointer-events: none; }
+  #speedo .sp-value { display: flex; align-items: baseline; gap: 6px; }
+  #sp-kmh {
+    font-size: 42px; font-weight: 800; line-height: 1; color: #f2f5f7;
+    font-variant-numeric: tabular-nums; min-width: 76px; text-align: right;
+    text-shadow: 0 0 18px rgba(83,200,232,0.35), 0 2px 4px #000;
+  }
+  #speedo.reversing #sp-kmh { color: #ff6b57; text-shadow: 0 0 18px rgba(255,75,56,0.4), 0 2px 4px #000; }
+  #speedo .sp-unit { font-size: 10px; letter-spacing: 3px; color: #8fa8b8; }
+  #speedo .sp-bar {
+    width: 120px; height: 8px; background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(255,255,255,0.22); border-radius: 2px; overflow: hidden;
+  }
+  #sp-fill {
+    height: 100%; width: 0%; border-radius: 1px;
+    background: linear-gradient(90deg, #3fa8c9, #7fd8f0);
+    box-shadow: 0 0 8px rgba(110,200,235,0.55);
+  }
+  #speedo.reversing #sp-fill { background: linear-gradient(90deg, #c9764a, #ff8a6b); box-shadow: 0 0 8px rgba(255,120,80,0.4); }
+  #speedo .sp-gear { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 40px; }
+  #sp-gear {
+    font-size: 26px; font-weight: 800; line-height: 1; color: #ffd24a;
+    text-shadow: 0 0 14px rgba(232,195,90,0.5), 0 2px 4px #000;
+  }
+  #speedo .sp-label { font-size: 9px; letter-spacing: 2px; color: #8fa8b8; }
+  #speedo.turbo { border-top-color: rgba(255,106,20,0.9); box-shadow: 0 10px 28px rgba(0,0,0,0.55), 0 0 24px rgba(255,106,20,0.35), inset 0 1px 0 rgba(255,255,255,0.08); }
+  #speedo.turbo #sp-kmh { color: #ffb066; text-shadow: 0 0 18px rgba(255,106,20,0.55), 0 2px 4px #000; }
+  #speedo.turbo #sp-fill { background: linear-gradient(90deg, #ff6a14, #ffd24a); box-shadow: 0 0 10px rgba(255,106,20,0.6); }
+
+  /* vinhetas de estado */
+  #lowhp {
+    position: absolute; inset: 0; opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(120,0,0,0.55) 100%);
+    transition: opacity 0.25s;
+  }
+  #dmgflash {
+    position: absolute; inset: 0; opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(180,20,10,0.5) 100%);
+  }
+
+  /* ---------- overlays ---------- */
+  #overlay {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(6, 10, 14, 0.88);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .screen { text-align: center; color: #e8eef2; max-width: 640px; padding: 20px; }
+  .screen .logo {
+    width: min(420px, 86%);
+    margin-bottom: 10px;
+    filter: drop-shadow(0 6px 18px rgba(0,0,0,0.55));
+    user-select: none; pointer-events: none;
+  }
+  .screen .sub { font-size: 14px; letter-spacing: 4px; color: #8fa8b8; margin-bottom: 28px; }
+  #screen-start .logo { margin-bottom: 34px; }
+  .screen h1 { font-size: 34px; letter-spacing: 10px; font-weight: 300; color: #e8eef2; }
+
+  /* ---------- controles interativos 3D ---------- */
+  #controls3d {
+    perspective: 900px; display: inline-block; margin-bottom: 30px;
+  }
+  #controls3d .row {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0; padding: 0;
+    transform-style: preserve-3d;
+    transition: transform 0.25s ease;
+  }
+  #controls3d .cap {
+    min-width: 120px; text-align: center;
+    font-family: monospace; font-size: 13px; font-weight: 700; letter-spacing: 1px;
+    color: #e8eef2;
+    background: linear-gradient(180deg, #2b3238 0%, #161b1f 100%);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-bottom-color: rgba(0,0,0,0.7);
+    border-radius: 6px;
+    padding: 7px 10px 6px;
+    box-shadow: 0 4px 0 #0a0d10, 0 6px 10px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.09);
+    transform-style: preserve-3d;
+    transition: transform 0.14s ease, box-shadow 0.14s ease, background 0.14s;
+    cursor: default;
+    position: relative;
+  }
+  #controls3d .row:hover .cap {
+    background: linear-gradient(180deg, #39424a 0%, #1c2226 100%);
+  }
+  #controls3d .row .desc {
+    font-size: 14px; color: #b7c4cc; text-align: left;
+    transition: color 0.15s;
+  }
+  #controls3d .row:hover .desc { color: #f0d68a; }
+  /* keycap "afundada" = tecla realmente pressionada */
+  #controls3d .cap.pressed {
+    transform: translateY(4px);
+    box-shadow: 0 0 0 #0a0d10, 0 1px 3px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+    background: linear-gradient(180deg, #454f58 0%, #232a2f 100%);
+    border-color: rgba(232,195,90,0.55);
+  }
+  /* tilt 3D no hover da linha (feito via JS) */
+  #controls3d .row.tilting .cap {
+    transition: transform 0.06s linear;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #controls3d .row, #controls3d .cap { transition: none !important; }
+  }
+  .btn {
+    pointer-events: auto; display: inline-block; cursor: pointer;
+    background: #e8c35a; color: #14181c; border: none;
+    font-size: 16px; font-weight: 700; letter-spacing: 3px;
+    padding: 13px 46px; border-radius: 3px;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .btn:hover { background: #f4d47c; transform: translateY(-1px); box-shadow: 0 8px 22px rgba(232,195,90,0.28); }
+  .btn:active { transform: translateY(1px); box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
+  .stats { font-size: 20px; margin-bottom: 26px; line-height: 2; }
+  .stats b { color: #e8c35a; }
+  .note { margin-top: 18px; font-size: 12px; color: #6d7d88; letter-spacing: 1px; }
+
+  /* ---------- deathcard 3D interativa ---------- */
+  #deathcard { perspective: 1100px; }
+  .dc-frame {
+    background:
+      linear-gradient(160deg, rgba(38,26,24,0.96), rgba(14,10,10,0.97));
+    border: 1px solid rgba(180,60,40,0.55);
+    border-radius: 8px;
+    padding: 34px 46px 30px;
+    box-shadow:
+      0 30px 80px rgba(0,0,0,0.75),
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      inset 0 0 90px rgba(120,20,10,0.18);
+    transform-style: preserve-3d;
+    transition: transform 0.12s ease-out;
+    min-width: 430px;
+    animation: dcin 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes dcin {
+    from { opacity: 0; transform: rotateX(28deg) translateY(46px) scale(0.92); }
+    to   { opacity: 1; transform: rotateX(0deg) translateY(0) scale(1); }
+  }
+  .dc-head { display: flex; align-items: center; gap: 18px; margin-bottom: 22px; }
+  .dc-cross {
+    width: 54px; height: 54px; display: flex; align-items: center; justify-content: center;
+    font-size: 30px; color: #ff5040;
+    background: rgba(255,70,50,0.1);
+    border: 1.5px solid rgba(255,80,60,0.6);
+    border-radius: 50%;
+    text-shadow: 0 0 12px rgba(255,70,50,0.8);
+    box-shadow: 0 0 24px rgba(255,70,50,0.25);
+    animation: pulsecross 1.6s ease-in-out infinite;
+  }
+  @keyframes pulsecross {
+    0%, 100% { box-shadow: 0 0 18px rgba(255,70,50,0.2); }
+    50% { box-shadow: 0 0 34px rgba(255,70,50,0.5); }
+  }
+  .dc-kia {
+    font-size: 44px; font-weight: 200; letter-spacing: 18px; color: #f5f0ee;
+    text-shadow: 0 0 26px rgba(255,80,60,0.4), 0 2px 4px rgba(0,0,0,0.9);
+    margin-right: -18px;
+  }
+  .dc-sub { font-size: 12px; letter-spacing: 4px; color: #c98a80; margin-top: 4px; }
+  .dc-dossier {
+    text-align: left; border-top: 1px solid rgba(255,255,255,0.1);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding: 16px 4px; margin-bottom: 26px;
+  }
+  .dc-row {
+    display: flex; justify-content: space-between; gap: 40px;
+    font-size: 14px; letter-spacing: 1.5px; padding: 5.5px 0;
+  }
+  .dc-row span { color: #96857f; }
+  .dc-row b { color: #e8e2df; font-weight: 600; }
+  .dc-row b.dc-gold { color: #e8c35a; }
+  .dc-note { margin-top: 14px; font-size: 11px; letter-spacing: 2px; color: #7a6a66; }
+  @media (prefers-reduced-motion: reduce) {
+    .dc-frame { animation: none; transition: none; }
+    .dc-cross { animation: none; }
+  }
+</style>
+</head>
+<body>
+  <div id="game"></div>
+
+  <div id="loadout" class="hidden"></div>
+
+  <div id="hud">
+    <div id="crosshair">
+      <div class="l t"></div><div class="l b"></div>
+      <div class="l lf"></div><div class="l rt"></div>
+      <div class="dot"></div>
+    </div>
+    <div id="hitmarker"></div>
+
+    <div id="scope-overlay">
+      <div id="scope-ring"></div>
+      <div id="scope-dot"></div>
+    </div>
+
+    <div id="scoreboard" class="hidden">
+      <h2>ESTATÍSTICAS DA MISSÃO</h2>
+      <table>
+        <thead><tr><th>OPERADOR</th><th class="num">ABATES</th><th class="num">MORTES</th><th class="num">PONTOS</th></tr></thead>
+        <tbody>
+          <tr class="me"><td>VOCÊ</td><td class="num" id="sb-player-kills">0</td><td class="num" id="sb-player-deaths">0</td><td class="num" id="sb-score">0</td></tr>
+          <tr class="hostiles"><td>HOSTIS (ONDA <span id="sb-wave">0</span>)</td><td class="num" id="sb-hostile-kills">0</td><td class="num">—</td><td class="num">—</td></tr>
+          <tbody id="sb-online"></tbody>
+        </tbody>
+      </table>
+      <div class="hint">SEGURE [TAB] PARA VISUALIZAR</div>
+    </div>
+
+    <div id="killbanner">
+      <svg class="kb-icon" viewBox="0 0 48 48" fill="none">
+        <circle cx="24" cy="24" r="17" stroke="currentColor" stroke-width="2.4"/>
+        <line x1="24" y1="2" x2="24" y2="10" stroke="currentColor" stroke-width="2.4"/>
+        <line x1="24" y1="38" x2="24" y2="46" stroke="currentColor" stroke-width="2.4"/>
+        <line x1="2" y1="24" x2="10" y2="24" stroke="currentColor" stroke-width="2.4"/>
+        <line x1="38" y1="24" x2="46" y2="24" stroke="currentColor" stroke-width="2.4"/>
+        <circle cx="24" cy="20" r="4.2" fill="currentColor"/>
+        <path d="M 14 34 Q 24 25.5 34 34 L 34 36 L 14 36 Z" fill="currentColor"/>
+      </svg>
+      <div>
+        <div class="kb-title">HOSTIL ELIMINADO</div>
+        <div class="kb-sub">+100 PONTOS</div>
+      </div>
+    </div>
+
+    <div id="top-center">
+      <div class="chip chip-wave"><span class="chip-label">ONDA</span><span class="chip-value" id="wave">0</span></div>
+      <div class="chip chip-hostiles" id="chip-hostiles"><span class="chip-label">HOSTIS</span><span class="chip-value" id="enemies">0</span></div>
+      <div class="chip chip-score"><span class="chip-label">PONTOS</span><span class="chip-value" id="score">0</span></div>
+      <div class="chip chip-online"><span class="chip-label">ONLINE</span><span class="chip-value" id="online">1</span></div>
+    </div>
+
+    <input id="chat-input" class="hidden" maxlength="80" placeholder="mensagem… [ENTER envia · ESC cancela]" autocomplete="off">
+
+    <div id="minimap-wrap"><canvas id="minimap" width="150" height="150"></canvas></div>
+
+    <div id="killfeed"></div>
+
+    <div id="bottom-left">
+      <div id="health">100</div>
+      <div>
+        <div id="health-bar-wrap"><div id="health-bar"></div></div>
+        <div id="shield-bar-wrap"><div id="shield-bar"></div></div>
+      </div>
+    </div>
+
+    <div id="bottom-right">
+      <div id="ammo">30 / 120</div>
+      <div id="weapon">M4A1</div>
+      <div id="grenade-cd"></div>
+      <div id="reload-hint">RECARREGUE [R]</div>
+      <div style="font-size:11px;color:#7a868f;letter-spacing:1px;margin-top:4px;">
+        [1] AK-47 · [2] DEAGLE · [3] SNIPER · [4] MP5 · [5] PUMP · [6/G] GRANADAS: <span id="gn-count">4</span> · [Q] LOADOUT · [X] SUPRESSOR · [E] CARRO · [SHIFT] TURBO
+      </div>
+    </div>
+
+    <div id="speedo" class="hidden">
+      <div class="sp-value"><span id="sp-kmh">0</span><span class="sp-unit">KM/H</span></div>
+      <div class="sp-bar"><div id="sp-fill"></div></div>
+      <div class="sp-gear"><span id="sp-gear">N</span><span class="sp-label">MARCHA</span></div>
+    </div>
+
+    <div id="lowhp"></div>
+    <div id="dmgflash"></div>
+  </div>
+
+  <div id="overlay">
+    <div id="screen-select" class="screen hidden">
+      <h1 style="margin-bottom:6px;">SELECIONE SEU OPERADOR</h1>
+      <div class="sub">CADA CLASSE MUDA SUA POSTURA EM CAMPO · [E] ENTRA EM CARROS</div>
+      <canvas id="op-canvas" width="600" height="680"></canvas>
+      <div id="op-name">BOPE</div>
+      <div id="op-desc">TROCA DE FOGO URBANA · COLETE PESADO</div>
+      <div class="op-cards">
+        <div class="op-card sel" data-op="0"><div class="op-icon">🛡️</div><div class="op-cname">BOPE</div><div class="op-role">Colete pesado · 50 de escudo extra · postura de choque</div></div>
+        <div class="op-card" data-op="1"><div class="op-icon">🎭</div><div class="op-cname">FACÇÃO</div><div class="op-role">Ágil e silencioso · passa despercebido entre hostis</div></div>
+        <div class="op-card" data-op="2"><div class="op-icon">🎯</div><div class="op-cname">FORÇA DELTA</div><div class="op-role">Operação noturna · recuo de arma reduzido</div></div>
+      </div>
+      <button id="btn-deploy" class="btn">ENTRAR EM COMBATE</button>
+      <div class="note">← → ou clique para escolher · ENTER para confirmar</div>
+    </div>
+
+    <div id="screen-start" class="screen">
+      <img src="logo.svg" alt="URBANA" class="logo">
+      <div id="controls3d">
+        <div class="row" data-key="KeyW,KeyA,KeyS,KeyD"><span class="cap">W A S D</span><span class="desc">Mover</span></div>
+        <div class="row" data-key="Mouse0,Mouse2"><span class="cap">MOUSE</span><span class="desc">Mirar</span></div>
+        <div class="row" data-key="ShiftLeft"><span class="cap">SHIFT</span><span class="desc">Correr</span></div>
+        <div class="row" data-key="ControlLeft,KeyC"><span class="cap">CTRL / C</span><span class="desc">Agachar</span></div>
+        <div class="row" data-key="Space"><span class="cap">ESPAÇO</span><span class="desc">Pular</span></div>
+        <div class="row" data-key="KeyR"><span class="cap">R</span><span class="desc">Recarregar</span></div>
+        <div class="row" data-key="KeyG,Digit4"><span class="cap">G / 4</span><span class="desc">Granada</span></div>
+        <div class="row" data-key="Digit1,Digit2,Digit3"><span class="cap">1 2 3</span><span class="desc">AK · Deagle · Sniper</span></div>
+        <div class="row" data-key="KeyX"><span class="cap">X</span><span class="desc">Supressor da Deagle (remove / instala)</span></div>
+        <div class="row" data-key="Tab"><span class="cap">TAB</span><span class="desc">Placar</span></div>
+        <div class="row" data-key="KeyV"><span class="cap">V</span><span class="desc">Câmera 3ª pessoa</span></div>
+        <div class="row" data-key="KeyE"><span class="cap">E</span><span class="desc">Entrar / sair do carro</span></div>
+        <div class="row" data-key="ShiftLeft"><span class="cap">SHIFT (NO CARRO)</span><span class="desc">Turbo com fogo no escapamento</span></div>
+        <div class="row" data-key="Escape"><span class="cap">ESC</span><span class="desc">Pausar</span></div>
+      </div><br>
+      <button id="btn-start" class="btn">INICIAR MISSÃO</button>
+    </div>
+
+    <div id="screen-pause" class="screen hidden">
+      <h1>PAUSADO</h1>
+      <div class="sub">SIMULAÇÃO SUSPENSA</div>
+      <button id="btn-resume" class="btn">CONTINUAR</button>
+    </div>
+
+    <div id="screen-over" class="screen hidden">
+      <div id="deathcard">
+        <div class="dc-frame">
+          <div class="dc-head">
+            <div class="dc-cross">✚</div>
+            <div>
+              <div class="dc-kia">K.I.A.</div>
+              <div class="dc-sub">OPERADOR ABATIDO EM CAMPO</div>
+            </div>
+          </div>
+          <div class="dc-dossier">
+            <div class="dc-row"><span>LOCAL</span><b>ZONA URBANA · SETOR 7</b></div>
+            <div class="dc-row"><span>CAUSA</span><b id="dc-cause">FOGO HOSTIL</b></div>
+            <div class="dc-row"><span>PONTUAÇÃO FINAL</span><b id="final-score" class="dc-gold">0</b></div>
+            <div class="dc-row"><span>ONDA ALCANÇADA</span><b id="final-wave">0</b></div>
+            <div class="dc-row"><span>ABATES CONFIRMADOS</span><b id="final-kills" class="dc-gold">0</b></div>
+          </div>
+          <button id="btn-restart" class="btn">REIMPLANTAR</button>
+          <div class="dc-note">Pressione ENTER para reimplantar</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
