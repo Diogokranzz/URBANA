@@ -19,7 +19,11 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="shortcut icon" type="image/svg+xml" href="favicon.svg">
 <link rel="apple-touch-icon" href="favicon.svg">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
@@ -390,6 +394,47 @@
     background: radial-gradient(ellipse at center, transparent 40%, rgba(180,20,10,0.5) 100%);
   }
 
+  #quality {
+    position: absolute; right: 18px; bottom: 18px; display: flex; gap: 8px; align-items: center;
+    background: rgba(10,14,17,0.78); border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 8px; padding: 8px 12px; backdrop-filter: blur(6px);
+  }
+  #quality span { font-size: 10px; letter-spacing: 3px; color: #8fa8b8; }
+  #quality button {
+    background: #1d2328; color: #b7c4cc; border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 5px; font-size: 11px; font-weight: 700; letter-spacing: 2px;
+    padding: 5px 12px; cursor: pointer; transition: background 0.15s, color 0.15s;
+  }
+  #quality button:hover { background: #2b333a; }
+  #quality button.on { background: #e8c35a; color: #14181c; border-color: #e8c35a; }
+
+  #touch-ui { position: fixed; inset: 0; z-index: 20; pointer-events: none; display: none; }
+  #touch-ui.on { display: block; }
+  #touch-ui .tbtn {
+    position: absolute; pointer-events: auto; touch-action: none;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; user-select: none; -webkit-user-select: none;
+    background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.16), rgba(10,14,17,0.6));
+    border: 1.5px solid rgba(255,255,255,0.28);
+    color: #e8eef2; font-weight: 700; font-size: 11px; letter-spacing: 1px;
+    text-shadow: 0 1px 2px #000; backdrop-filter: blur(2px);
+  }
+  #touch-ui .tbtn:active, #touch-ui .tbtn.held { background: rgba(232,195,90,0.4); border-color: #e8c35a; }
+  #touch-look {
+    position: absolute; right: 0; bottom: 0; width: 58%; height: 62%;
+    pointer-events: auto; touch-action: none;
+  }
+  #touch-stick {
+    position: absolute; left: 26px; bottom: 30px; width: 132px; height: 132px;
+    pointer-events: auto; touch-action: none;
+    border-radius: 50%; border: 2px solid rgba(255,255,255,0.22);
+    background: radial-gradient(circle, rgba(10,14,17,0.5), rgba(10,14,17,0.15));
+  }
+  #touch-knob {
+    position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px;
+    border-radius: 50%; background: rgba(232,195,90,0.55); border: 2px solid #e8c35a;
+  }
+
   #overlay {
     position: fixed; inset: 0; z-index: 50;
     background: rgba(6, 10, 14, 0.88);
@@ -530,6 +575,20 @@
 <body>
   <div id="game"></div>
 
+  <div id="touch-ui">
+    <div id="touch-look"></div>
+    <div id="touch-stick"><div id="touch-knob"></div></div>
+    <div class="tbtn" data-k="KeyW" style="right:20px; bottom:190px; width:64px; height:64px;">ACELERA</div>
+    <div class="tbtn" data-k="KeyS" style="right:20px; bottom:120px; width:56px; height:56px;">RÉ</div>
+    <div class="tbtn" data-k="ShiftLeft" style="right:96px; bottom:206px; width:58px; height:58px;">TURBO</div>
+    <div class="tbtn" data-k="KeyE" style="right:96px; bottom:140px; width:50px; height:50px;">CARRO</div>
+    <div class="tbtn" data-k="Space" style="left:180px; bottom:60px; width:60px; height:60px;">PULAR</div>
+    <div class="tbtn" data-k="KeyR" style="left:180px; bottom:128px; width:52px; height:52px;">RECARGA</div>
+    <div class="tbtn" data-k="KeyG" style="left:174px; bottom:196px; width:52px; height:52px;">GRANADA</div>
+    <div class="tbtn" data-k="KeyV" style="left:20px; top:80px; width:50px; height:50px;">CAM</div>
+    <div class="tbtn" data-k="KeyQ" style="left:80px; top:80px; width:50px; height:50px;">ARSENAL</div>
+  </div>
+
   <div id="loadout" class="hidden"></div>
 
   <div id="hud">
@@ -611,6 +670,20 @@
       <div class="sp-gear"><span id="sp-gear">N</span><span class="sp-label">MARCHA</span></div>
     </div>
 
+    <div id="touch-ui">
+      <div id="touch-look"></div>
+      <div id="touch-stick"><div id="touch-knob"></div></div>
+      <div class="tbtn" data-k="KeyW" style="right:20px; bottom:190px; width:64px; height:64px;">ACELERA</div>
+      <div class="tbtn" data-k="KeyS" style="right:20px; bottom:120px; width:56px; height:56px;">RÉ</div>
+      <div class="tbtn" data-k="ShiftLeft" style="right:96px; bottom:206px; width:58px; height:58px;">TURBO</div>
+      <div class="tbtn" data-k="KeyE" style="right:96px; bottom:140px; width:50px; height:50px;">CARRO</div>
+      <div class="tbtn" data-k="Space" style="left:180px; bottom:60px; width:60px; height:60px;">PULAR</div>
+      <div class="tbtn" data-k="KeyR" style="left:180px; bottom:128px; width:52px; height:52px;">RECARGA</div>
+      <div class="tbtn" data-k="KeyG" style="left:174px; bottom:196px; width:52px; height:52px;">GRANADA</div>
+      <div class="tbtn" data-k="KeyV" style="left:20px; top:80px; width:50px; height:50px;">CAM</div>
+      <div class="tbtn" data-k="KeyQ" style="left:80px; top:80px; width:50px; height:50px;">ARSENAL</div>
+    </div>
+
     <div id="lowhp"></div>
     <div id="dmgflash"></div>
   </div>
@@ -651,6 +724,7 @@
         <div class="row" data-key="Escape"><span class="cap">ESC</span><span class="desc">Pausar</span></div>
       </div><br>
       <button id="btn-start" class="btn">INICIAR MISSÃO</button>
+      <div id="quality"><span>QUALIDADE</span><button data-q="baixa">BAIXA</button><button data-q="media" class="on">MÉDIA</button><button data-q="alta">ALTA</button></div>
     </div>
 
     <div id="screen-pause" class="screen hidden">
@@ -684,5 +758,6 @@
   </div>
 
   <script type="module" src="src/main.js"></script>
+  <script src="sw-register.js"></script>
 </body>
 </html>

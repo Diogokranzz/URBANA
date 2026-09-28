@@ -20,7 +20,7 @@ jobs:
 
       - name: Valida os arquivos JavaScript
         run: |
-          for f in src/*.js server.js remote-player-test.js; do
+          for f in src/*.js server.js sw-register.js remote-player-test.js; do
             node --check "$f"
           done
 
@@ -42,7 +42,7 @@ jobs:
           git fetch origin gh-pages 2>/dev/null || true
           git checkout gh-pages 2>/dev/null || git checkout --orphan gh-pages
           git rm -rqf . 2>/dev/null || true
-          git checkout main -- index.html logo.svg favicon.svg src vendor docs
+          git checkout main -- index.html logo.svg favicon.svg manifest.json sw.js sw-register.js icon192.png icon512.png src vendor docs
           touch .nojekyll
           printf '*.log\n' > .gitignore
           git add -A

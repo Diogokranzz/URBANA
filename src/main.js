@@ -22,6 +22,7 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.08, 500);
 
 const world = buildWorld(scene);
+if (scene.fog) world.baseFog = scene.fog;
 const phys = new Physics(world.colliders);
 const fx = new FX(scene);
 const audio = new AudioSys();
@@ -156,6 +157,7 @@ addEventListener('keyup', e => {
 
 const canvas = renderer.domElement;
 canvas.addEventListener('mousedown', e => {
+  if (touchMode) return;
   if (!pointerLocked) { canvas.requestPointerLock(); audio.init(); audio.resume(); return; }
   if (e.button === 0) mouseDown = true;
   if (e.button === 2) mouse2Down = true;
@@ -264,6 +266,48 @@ function setChip(el, val) {
   el.classList.remove('bump');
   void el.offsetWidth;
   el.classList.add('bump');
+}
+
+function applyQuality(q) {
+  const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  const small = Math.min(innerWidth, innerHeight) < 820;
+  let auto = 'alta';
+  if (isTouch || small) auto = 'baixa';
+  const level = (q || localStorage.getItem('urbana-quality') || auto);
+  try { localStorage.setItem('urbana-quality', level); } catch {}
+  if (level === 'baixa') {
+    renderer.setPixelRatio(1);
+    renderer.shadowMap.enabled = false;
+    scene.fog = null;
+  } else if (level === 'media') {
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
+    if (world.baseFog) { scene.fog = world.baseFog; }
+  } else {
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    if (world.baseFog) { scene.fog = world.baseFog; }
+  }
+  if (world.sun) {
+    world.sun.castShadow = renderer.shadowMap.enabled;
+    if (world.sun.shadow.map && !renderer.shadowMap.enabled) {
+      world.sun.shadow.map.dispose();
+      world.sun.shadow.map = null;
+    }
+  }
+  renderer.setSize(innerWidth, innerHeight);
+  document.querySelectorAll('#quality button').forEach(b => b.classList.toggle('on', b.dataset.q === level));
+}
+
+function initQualityUi() {
+  document.querySelectorAll('#quality button').forEach(b => {
+    b.addEventListener('click', () => {
+      audio.uiPress();
+      applyQuality(b.dataset.q);
+    });
+  });
 }
 
 function loadRecord() {
@@ -1228,6 +1272,8 @@ function initMenuInteractivity() {
   });
 }
 initMenuInteractivity();
+initQualityUi();
+initTouchControls();
 
 let opRenderer = null, opScene = null, opCam = null, opMesh = null, opSpin = 0, opKind = 'police';
 
@@ -1419,8 +1465,86 @@ window.__fpsDebug = {
   get avatar() { return playerAvatar; },
 };
 
+let touchMode = false;
+
+function initTouchControls() {
+  const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  const ui = document.getElementById('touch-ui');
+  if (!isTouch || !ui) return;
+  touchMode = true;
+  ui.classList.add('on');
+  const stick = document.getElementById('touch-stick');
+  const knob = document.getElementById('touch-knob');
+  const look = document.getElementById('touch-look');
+  let stickId = null, lookId = null;
+  let stickCx = 0, stickCy = 0, lookX = 0, lookY = 0;
+
+  ui.querySelectorAll('.tbtn').forEach(btn => {
+    const code = btn.dataset.k;
+    const down = e => { e.preventDefault(); keys[code] = true; btn.classList.add('held'); if (window.__uiSetKeyVisual) window.__uiSetKeyVisual(code, true); if (code === 'KeyE' && state.running && !state.over) { vehicle ? exitVehicle() : enterVehicle(); } if (code === 'KeyV' && state.running && !state.over) toggleThirdPerson(); };
+    const up = e => { e.preventDefault(); keys[code] = false; btn.classList.remove('held'); if (window.__uiSetKeyVisual) window.__uiSetKeyVisual(code, false); };
+    btn.addEventListener('touchstart', down, { passive: false });
+    btn.addEventListener('touchend', up, { passive: false });
+    btn.addEventListener('touchcancel', up, { passive: false });
+  });
+
+  stick.addEventListener('touchstart', e => {
+    const t = e.changedTouches[0];
+    stickId = t.identifier;
+    const r = stick.getBoundingClientRect();
+    stickCx = r.left + r.width / 2; stickCy = r.top + r.height / 2;
+    e.preventDefault();
+  }, { passive: false });
+  stick.addEventListener('touchmove', e => {
+    for (const t of e.changedTouches) {
+      if (t.identifier !== stickId) continue;
+      let dx = t.clientX - stickCx, dy = t.clientY - stickCy;
+      const len = Math.hypot(dx, dy), max = 56;
+      if (len > max) { dx = dx / len * max; dy = dy / len * max; }
+      knob.style.transform = `translate(${dx}px, ${dy}px)`;
+      keys['KeyW'] = dy < -14;
+      keys['KeyS'] = dy > 14;
+      keys['KeyA'] = dx < -14;
+      keys['KeyD'] = dx > 14;
+    }
+    e.preventDefault();
+  }, { passive: false });
+  const stickEnd = e => {
+    for (const t of e.changedTouches) {
+      if (t.identifier !== stickId) continue;
+      stickId = null;
+      knob.style.transform = '';
+      keys['KeyW'] = keys['KeyS'] = keys['KeyA'] = keys['KeyD'] = false;
+    }
+  };
+  stick.addEventListener('touchend', stickEnd);
+  stick.addEventListener('touchcancel', stickEnd);
+
+  look.addEventListener('touchstart', e => {
+    const t = e.changedTouches[0];
+    lookId = t.identifier; lookX = t.clientX; lookY = t.clientY;
+    e.preventDefault();
+  }, { passive: false });
+  look.addEventListener('touchmove', e => {
+    for (const t of e.changedTouches) {
+      if (t.identifier !== lookId) continue;
+      applyLookDelta(t.clientX - lookX, t.clientY - lookY);
+      lookX = t.clientX; lookY = t.clientY;
+    }
+    e.preventDefault();
+  }, { passive: false });
+  const lookEnd = e => { for (const t of e.changedTouches) if (t.identifier === lookId) lookId = null; };
+  look.addEventListener('touchend', lookEnd);
+  look.addEventListener('touchcancel', lookEnd);
+
+  document.addEventListener('pointerlockchange', () => {
+    if (touchMode && document.pointerLockElement === canvas) document.exitPointerLock();
+  });
+}
+
 showOverlay('start');
 showRecordLine();
+applyQuality();
 requestAnimationFrame(frame);
 
 setInterval(() => {

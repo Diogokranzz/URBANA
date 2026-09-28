@@ -6,7 +6,7 @@
   <a href="https://diogokranzz.github.io/URBANA/">▶ JOGAR AGORA NO ENDEREÇO OFICIAL</a>
 </p>
 
-FPS tático urbano em português do Brasil, feito com three.js puro e Node.js sem nenhuma dependência externa em tempo de execução. O jogo roda direto no navegador com ondas de IA armada, carros dirigíveis com turbo e fogo no escapamento, multiplayer cooperativo por WebSocket e áudio sintetizado em tempo real, sem nenhum arquivo de som.
+FPS tático urbano em português do Brasil, feito com three.js puro e Node.js sem nenhuma dependência externa em tempo de execução. O jogo roda direto no navegador com ondas de IA armada, carros dirigíveis com turbo e fogo no escapamento, multiplayer cooperativo por WebSocket e áudio sintetizado em tempo real, sem nenhum arquivo de som. Também instala no celular como aplicativo, funciona offline depois da primeira visita, tem controles de toque com joystick virtual e um seletor de qualidade gráfica no menu.
 
 <img src="docs/divider.svg" width="100%">
 
@@ -53,6 +53,20 @@ A porta padrão é 8137 e o WebSocket do multiplayer responde na rota /ws do mes
 15. T: chat do multiplayer.
 16. ESC: pausar.
 
+No celular o jogo traz controles próprios de toque, descritos na seção seguinte.
+
+<img src="docs/divider.svg" width="100%">
+
+## Controles de toque no celular
+
+Em telas com toque o jogo mostra seus próprios controles: um joystick virtual no canto esquerdo para mover, uma área de olhar na metade direita para girar a câmera e uma fileira de botões com as ações principais, a saber ACELERA, RÉ, TURBO, CARRO, PULAR, RECARGA, GRANADA, CÂMERA e ARSENAL. Tudo funciona ao mesmo tempo, então dá para dirigir, girar a câmera e acionar o turbo com os dois polegares. Dentro do carro o joystick acelera e faz ré, o botão CARRO sai do veículo e o turbo mantém as chamas no escapamento. O modo de toque liga sozinho em aparelhos com tela sensível e some no computador, onde seguem valendo teclado e mouse.
+
+<img src="docs/divider.svg" width="100%">
+
+## Qualidade gráfica
+
+O menu inicial tem um seletor de qualidade com três níveis. A baixa desliga sombras e névoa e usa resolução reduzida, a média traz sombras simples com resolução intermediária e a alta entrega o visual completo com sombras suaves, névoa e resolução máxima, pensada para computadores fortes. Em celulares e telas pequenas a baixa entra sozinha na primeira visita, e a escolha fica salva no navegador para as próximas partidas.
+
 <img src="docs/divider.svg" width="100%">
 
 ## O carro, o turbo e o escapamento
@@ -60,6 +74,10 @@ A porta padrão é 8137 e o WebSocket do multiplayer responde na rota /ws do mes
 Aperte E perto de qualquer carro para assumir a direção. O boneco do jogador senta no banco do motorista, as mãos vão ao volante, que gira de verdade com a direção, e a câmera segue o carro em perseguição com o velocímetro no canto da tela. O carro acelera até cerca de 75 km/h no modo normal, faz ré e colide com postes, hidrantes e muros por toda a área da lataria, não só pelo centro.
 
 Segurando SHIFT com W pressionado o turbo entra em ação: os dois canos do escapamento na traseira cospem chamas com núcleo amarelo e halo laranja em tremulação, o som do motor ganha um assobio de turbina com o estalo da ignição, o campo de visão abre, o velocímetro acende em laranja e o teto de velocidade sobe para cerca de 108 km/h.
+
+<p align="center">
+  <img src="docs/gameplay.gif" alt="Carro acelerando com o turbo soltando chamas pelo escapamento" width="100%">
+</p>
 
 Atropelar hostis em alta velocidade derruba os inimigos com ragdoll capotando, respingo de sangue, som de impacto na lataria e tremor de câmera, rendendo pontos de abate.
 
@@ -106,6 +124,9 @@ O recorde pessoal do jogador fica salvo no próprio navegador: a melhor pontuaç
 9. src/net.js: cliente de WebSocket com reconexão automática e interpolação de jogadores remotos.
 10. index.html: telas, HUD, velocímetro e estilos.
 11. vendor/three.module.js: biblioteca three.js r160 vendada localmente, mantida intacta por ser código de terceiros.
+12. manifest.json: manifesto do aplicativo web com nome, cores e ícones.
+13. sw.js: service worker que guarda o jogo em cache para funcionar sem internet.
+14. O pequeno script de registro do service worker, que também checa atualizações em segundo plano.
 
 <img src="docs/divider.svg" width="100%">
 
@@ -116,6 +137,8 @@ O jogo está publicado e sempre no ar no GitHub Pages, no endereço https://diog
 A publicação é automática: a cada envio para o branch principal, o GitHub Actions valida todos os arquivos JavaScript e republica o site sozinho, sem nenhum passo manual. O site também carrega capa de compartilhamento, título e descrição, então o link aparece bonito e com imagem de preview no WhatsApp, no Discord e em redes sociais.
 
 Nesse cenário estático o modo individual funciona por completo; o multiplayer exige um servidor Node.js ativo, então para manter o multiplayer no ar com salas e chat é preciso uma hospedagem que rode Node, como Render ou Railway. O projeto já está pronto para isso: o comando de start é node server.js, a porta vem da variável de ambiente PORT e o host liberado vem de URBANA_HOST. Localmente, basta rodar node server.js e o multiplayer volta a funcionar na rede da sua máquina.
+
+O pacote publicado também é um aplicativo web progressivo: inclui o manifesto, o service worker e os ícones, então o site publicado pode ser instalado no celular pela opção do navegador e as partidas individuais continuam funcionando sem internet depois da primeira visita.
 
 <img src="docs/divider.svg" width="100%">
 

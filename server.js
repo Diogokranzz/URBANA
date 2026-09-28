@@ -20,6 +20,7 @@ const types = {
 const CSP = [
   "default-src 'self'",
   "script-src 'self'",
+  "worker-src 'self'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data:",
   "media-src 'self' data:",
