@@ -16,10 +16,8 @@
 
   .hidden { display: none !important; }
 
-  /* ---------- HUD ---------- */
   #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
 
-  /* crosshair dinâmico */
   #crosshair {
     --gap: 10px;
     position: absolute; left: 50%; top: 50%;
@@ -47,7 +45,6 @@
   #hitmarker::before { left: 50%; top: 0; width: 2px; height: 100%; margin-left: -1px; }
   #hitmarker::after { top: 50%; left: 0; height: 2px; width: 100%; margin-top: -1px; }
 
-  /* canto inferior esquerdo: vida */
   #bottom-left {
     position: absolute; left: 26px; bottom: 24px;
     display: flex; align-items: center; gap: 14px;
@@ -74,7 +71,6 @@
   }
   #shield-bar.empty { opacity: 0.25; box-shadow: none; }
 
-  /* ---------- painel de loadout (Q) ---------- */
   #loadout {
     position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
     min-width: 560px; padding: 24px 34px 20px;
@@ -114,7 +110,6 @@
   .lo-state.on { color: #7ec97e; } .lo-state.off { color: #c9764a; }
   .lo-foot { margin-top: 14px; font-size: 11px; color: #6d7d88; letter-spacing: 2px; text-align: center; }
 
-  /* ---------- seleção de operador ---------- */
   #screen-select { max-width: 860px; }
   #op-canvas {
     display: block; width: 300px; height: 340px; margin: 4px auto 10px;
@@ -140,7 +135,6 @@
   .op-card .op-role { font-size: 10.5px; letter-spacing: 1.5px; color: #8fa8b8; margin-top: 4px; line-height: 1.5; }
   #screen-select .btn { margin-top: 4px; }
 
-  /* canto inferior direito: munição */
   #bottom-right {
     position: absolute; right: 26px; bottom: 24px; text-align: right;
   }
@@ -152,7 +146,6 @@
   #grenade-cd { font-size: 12px; color: #ffd24a; height: 14px; }
   #reload-hint { font-size: 13px; color: #ffd24a; letter-spacing: 2px; opacity: 0; transition: opacity 0.2s; }
 
-  /* chat multiplayer */
   #chat-input {
     position: absolute; left: 20px; bottom: 90px; width: 320px;
     background: rgba(6,9,12,0.9); border: 1px solid rgba(232,195,90,0.5);
@@ -160,7 +153,6 @@
     color: #e8eef2; font-size: 14px; letter-spacing: 0.5px; outline: none;
   }
 
-  /* ---------- placar superior animado (chips de vidro estilo esports) ---------- */
   #top-center {
     position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
     display: flex; gap: 10px; align-items: stretch; pointer-events: none;
@@ -178,7 +170,6 @@
   .chip:nth-child(2) { animation-delay: 0.12s; }
   .chip:nth-child(3) { animation-delay: 0.24s; }
   @keyframes chipIn { from { opacity: 0; transform: translateY(-26px) scale(0.9); } to { opacity: 1; transform: none; } }
-  /* varredura de brilho periódica (sheen) */
   .chip::after {
     content: ''; position: absolute; top: 0; left: -80%; width: 60%; height: 100%;
     background: linear-gradient(105deg, transparent, rgba(255,255,255,0.14), transparent);
@@ -215,7 +206,6 @@
     -webkit-background-clip: text; background-clip: text; color: transparent;
     text-shadow: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.7));
   }
-  /* pop do dígito quando o valor muda */
   .chip-value.bump { animation: bump 0.38s cubic-bezier(0.2, 1.6, 0.4, 1); }
   @keyframes bump {
     0%   { transform: scale(1); }
@@ -226,7 +216,6 @@
     .chip, .chip::after, .chip-hostiles.hot .chip-value, .chip-value.bump { animation: none !important; }
   }
 
-  /* minimapa */
   #minimap-wrap {
     position: absolute; top: 20px; right: 20px;
     border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; overflow: hidden;
@@ -234,7 +223,6 @@
   }
   #minimap { display: block; }
 
-  /* kill feed */
   #killfeed {
     position: absolute; top: 20px; left: 20px;
     display: flex; flex-direction: column; gap: 4px; max-width: 420px;
@@ -246,7 +234,6 @@
   }
   @keyframes feedin { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; } }
 
-  /* banner 3D de eliminação */
   #killbanner {
     position: absolute; left: 50%; top: 34%;
     display: flex; align-items: center; gap: 14px;
@@ -265,18 +252,16 @@
     text-shadow: 0 0 14px rgba(232,195,90,0.35), 0 2px 3px rgba(0,0,0,0.8);
   }
   #killbanner .kb-sub { font-size: 13px; letter-spacing: 3px; color: #ffd24a; margin-top: 2px; }
-  /* variante headshot */
   #killbanner.head { border-left-color: #ff4b38; box-shadow: 0 12px 34px rgba(120,10,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1); }
   #killbanner.head .kb-icon { color: #ff4b38; }
   #killbanner.head .kb-title { color: #ffd24a; text-shadow: 0 0 16px rgba(255,75,56,0.5), 0 2px 3px rgba(0,0,0,0.8); }
-  /* overlay da luneta do sniper */
   #scope-overlay {
     position: absolute; inset: 0;
     opacity: 0; pointer-events: none;
     transition: opacity 0.12s;
     background: radial-gradient(circle at center, transparent 29.5%, rgba(2,3,4,0.98) 30.5%);
   }
-  #scope-overlay::before {  /* retícula: cruz fina mil-dot */
+  #scope-overlay::before {
     content: ''; position: absolute; left: 50%; top: 0; width: 1.5px; height: 100%;
     transform: translateX(-50%);
     background: rgba(10,10,10,0.9);
@@ -302,7 +287,6 @@
   }
   #scope-overlay.on { opacity: 1; }
 
-  /* placar TAB */
   #scoreboard {
     position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
     min-width: 440px;
@@ -342,7 +326,6 @@
     @keyframes kbflat { 0% { opacity: 0; } 12% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
   }
 
-  /* ---------- velocímetro (dirigindo) ---------- */
   #speedo {
     position: absolute; right: 26px; bottom: 88px;
     display: flex; align-items: center; gap: 16px;
@@ -384,7 +367,6 @@
   #speedo.turbo #sp-kmh { color: #ffb066; text-shadow: 0 0 18px rgba(255,106,20,0.55), 0 2px 4px #000; }
   #speedo.turbo #sp-fill { background: linear-gradient(90deg, #ff6a14, #ffd24a); box-shadow: 0 0 10px rgba(255,106,20,0.6); }
 
-  /* vinhetas de estado */
   #lowhp {
     position: absolute; inset: 0; opacity: 0;
     background: radial-gradient(ellipse at center, transparent 55%, rgba(120,0,0,0.55) 100%);
@@ -395,7 +377,6 @@
     background: radial-gradient(ellipse at center, transparent 40%, rgba(180,20,10,0.5) 100%);
   }
 
-  /* ---------- overlays ---------- */
   #overlay {
     position: fixed; inset: 0; z-index: 50;
     background: rgba(6, 10, 14, 0.88);
@@ -412,7 +393,6 @@
   #screen-start .logo { margin-bottom: 34px; }
   .screen h1 { font-size: 34px; letter-spacing: 10px; font-weight: 300; color: #e8eef2; }
 
-  /* ---------- controles interativos 3D ---------- */
   #controls3d {
     perspective: 900px; display: inline-block; margin-bottom: 30px;
   }
@@ -445,14 +425,12 @@
     transition: color 0.15s;
   }
   #controls3d .row:hover .desc { color: #f0d68a; }
-  /* keycap "afundada" = tecla realmente pressionada */
   #controls3d .cap.pressed {
     transform: translateY(4px);
     box-shadow: 0 0 0 #0a0d10, 0 1px 3px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
     background: linear-gradient(180deg, #454f58 0%, #232a2f 100%);
     border-color: rgba(232,195,90,0.55);
   }
-  /* tilt 3D no hover da linha (feito via JS) */
   #controls3d .row.tilting .cap {
     transition: transform 0.06s linear;
   }
@@ -472,7 +450,6 @@
   .stats b { color: #e8c35a; }
   .note { margin-top: 18px; font-size: 12px; color: #6d7d88; letter-spacing: 1px; }
 
-  /* ---------- deathcard 3D interativa ---------- */
   #deathcard { perspective: 1100px; }
   .dc-frame {
     background:

@@ -1,22 +1,15 @@
-// ============================================================
-//  NET — cliente multiplayer (WebSocket puro, sem dependências)
-//  - Reconexão automática com backoff
-//  - Jogadores remotos: bonecos reais + nameplate + interpolação
-//  - Tiros remotos: tracer + flash + áudio 3D pan
-//  - Anti-cheat é 100% no servidor; aqui só renderizamos o que chega
-// ============================================================
 import * as THREE from '../vendor/three.module.js';
 import { makeOperatorMesh } from './entities.js';
 
 export class Net {
   constructor(scene) {
-    this.scene = scene;           // onde os jogadores remotos vivem
+    this.scene = scene;
     this.ws = null;
     this.connected = false;
     this.id = null;
-    this.players = new Map();     // id -> { mesh, plate, target, yawT, ... }
-    this.onFeed = null;           // callback para killfeed/chat
-    this.onRoster = null;         // callback para placar online
+    this.players = new Map();
+    this.onFeed = null;
+    this.onRoster = null;
     this.retry = 0;
     this.closedByUs = false;
     this.stateAcc = 0;
@@ -44,7 +37,7 @@ export class Net {
       this.clearPlayers();
       this.scheduleRetry();
     };
-    this.ws.onerror = () => { /* onclose cuida da reconexão */ };
+    this.ws.onerror = () => {   };
   }
 
   scheduleRetry() {
@@ -69,7 +62,7 @@ export class Net {
     }
     return n;
   }
-  myCls = 'police';   // main atualiza conforme a classe escolhida
+  myCls = 'police';
 
   send(obj) {
     if (this.connected && this.ws && this.ws.readyState === 1) {
@@ -77,10 +70,9 @@ export class Net {
     }
   }
 
-  // ---- API usada pelo jogo ----
   sendState(pos, yaw, pitch, slot, hp, moving) {
     this.stateAcc++;
-    if (this.stateAcc % 2) return;                    // ~10 Hz (rAF ~20 nos testes; server tolera)
+    if (this.stateAcc % 2) return;
     this.send({ t: 'state', p: [+pos.x.toFixed(2), +pos.y.toFixed(2), +pos.z.toFixed(2)], yaw: +yaw.toFixed(2), pitch: +pitch.toFixed(2), slot, hp, m: moving ? 1 : 0 });
   }
   sendShot(origin, dir, sfx) {
@@ -89,7 +81,6 @@ export class Net {
   sendKill(dmg) { this.send({ t: 'hit', dmg: Math.max(1, Math.min(45, dmg | 0)), kill: 1 }); }
   sendChat(m) { this.send({ t: 'chat', m }); }
 
-  // ---- mensagens do servidor ----
   dispatch(raw) {
     let m; try { m = JSON.parse(raw); } catch { return; }
     switch (m.t) {
@@ -102,7 +93,7 @@ export class Net {
       case 'join': this.spawn(m.pl); if (this.onRoster) this.onRoster(); break;
       case 'leave': this.remove(m.id); if (this.onRoster) this.onRoster(); break;
       case 'states': for (const s of m.s) this.applyState(s); break;
-      case 'snap': /* correção anti-cheat do servidor */ break;
+      case 'snap':   break;
       case 'shots': for (const s of m.s) this.remoteShot(s); break;
       case 'chat': if (this.onFeed) this.onFeed(`${m.name}: ${m.m}`, '#c9d8a0'); break;
       case 'score': if (this.onRoster) this.onRoster(m.b); break;
@@ -110,12 +101,10 @@ export class Net {
     }
   }
 
-  // ---- jogadores remotos ----
   spawn(pl) {
     if (this.players.has(pl.id) || pl.id === this.id) return;
     const mesh = makeOperatorMesh(pl.cls === 'thug' ? 'thug' : 'police');
     mesh.traverse(o => { if (o.isMesh) o.castShadow = true; });
-    // nameplate (canvas → sprite)
     const cv = document.createElement('canvas');
     cv.width = 256; cv.height = 64;
     const g = cv.getContext('2d');
@@ -130,7 +119,7 @@ export class Net {
     plate.scale.set(1.5, 0.375, 1);
     plate.position.y = 2.15;
     mesh.add(plate);
-    if (this.scene) this.scene.add(mesh);   // entra no mundo de verdade
+    if (this.scene) this.scene.add(mesh);
     this.players.set(pl.id, {
       mesh, plate, name: pl.name, cls: pl.cls, kills: 0,
       target: new THREE.Vector3(), yawT: 0, pitchT: 0, slot: 0, hp: 100,
@@ -158,23 +147,19 @@ export class Net {
   }
 
   remoteShot(s) {
-    // [id, ox, oy, oz, dx, dy, dz, sfx]
     if (!this.onRemoteShot) return;
     this.onRemoteShot(s);
   }
 
-  // ---- por frame: interpolação + caminhada remota ----
   update(dt) {
     for (const r of this.players.values()) {
       if (!r.mesh.parent) continue;
-      // interpolação suave da posição/rotação (rede a 12,5 Hz → 60fps fluido)
       const k = 1 - Math.exp(-12 * dt);
       r.mesh.position.lerp(r.target, k);
       let d = r.yawT - r.mesh.rotation.y;
       while (d > Math.PI) d -= Math.PI * 2;
       while (d < -Math.PI) d += Math.PI * 2;
       r.mesh.rotation.y += d * k;
-      // caminhada procedural quando o remoto se move
       r.animT += dt * (r.moving ? 8 : 2);
       const kids = r.mesh.children;
       const armL = kids[kids.length - 4], armR = kids[kids.length - 3];

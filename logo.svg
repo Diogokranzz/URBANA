@@ -1,6 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 150" width="560" height="150">
   <defs>
-    <!-- aço escovado do aro externo -->
     <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#8b939c"/>
       <stop offset="0.28" stop-color="#3c434b"/>
@@ -8,20 +7,17 @@
       <stop offset="0.8" stop-color="#4a525b"/>
       <stop offset="1" stop-color="#14171b"/>
     </linearGradient>
-    <!-- face interna do aro -->
     <radialGradient id="innerFace" cx="0.5" cy="0.38" r="0.75">
       <stop offset="0" stop-color="#3a4149"/>
       <stop offset="0.62" stop-color="#1b1f24"/>
       <stop offset="1" stop-color="#0a0c0e"/>
     </radialGradient>
-    <!-- bisel dourado -->
     <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#ffe9a8"/>
       <stop offset="0.35" stop-color="#e8c35a"/>
       <stop offset="0.65" stop-color="#a97e2b"/>
       <stop offset="1" stop-color="#6e5017"/>
     </linearGradient>
-    <!-- ponto vermelho com glow -->
     <radialGradient id="dot" cx="0.42" cy="0.38" r="0.7">
       <stop offset="0" stop-color="#ffb0a0"/>
       <stop offset="0.35" stop-color="#ff4b38"/>
@@ -31,7 +27,6 @@
       <stop offset="0" stop-color="#ff3b30" stop-opacity="0.55"/>
       <stop offset="1" stop-color="#ff3b30" stop-opacity="0"/>
     </radialGradient>
-    <!-- metal do texto -->
     <linearGradient id="textMetal" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#ffffff"/>
       <stop offset="0.42" stop-color="#dfe6ec"/>
@@ -54,40 +49,28 @@
     </filter>
   </defs>
 
-  <!-- ==================== EMBLEMA: mira red dot 3D ==================== -->
   <g filter="url(#softShadow)">
-    <!-- profundidade (extrusão) -->
     <circle cx="72" cy="80" r="56" fill="#07090b"/>
     <circle cx="72" cy="76" r="56" fill="url(#steel)"/>
-    <!-- face do aro -->
     <circle cx="72" cy="76" r="46" fill="url(#steel)"/>
     <circle cx="72" cy="76" r="45" fill="url(#innerFace)"/>
-    <!-- anel dourado fino (bisel interno) -->
     <circle cx="72" cy="76" r="38" fill="none" stroke="url(#gold)" stroke-width="2.6"/>
-    <!-- reflexo superior do aco (highlight 3D) -->
     <path d="M 30 56 A 46 46 0 0 1 114 56" fill="none" stroke="#cfd8e0" stroke-opacity="0.5" stroke-width="3" stroke-linecap="round"/>
-    <!-- retículo: traços finos -->
     <line x1="72" y1="46" x2="72" y2="58" stroke="#cfd8e0" stroke-opacity="0.55" stroke-width="2"/>
     <line x1="72" y1="94" x2="72" y2="106" stroke="#cfd8e0" stroke-opacity="0.55" stroke-width="2"/>
     <line x1="42" y1="76" x2="54" y2="76" stroke="#cfd8e0" stroke-opacity="0.55" stroke-width="2"/>
     <line x1="90" y1="76" x2="102" y2="76" stroke="#cfd8e0" stroke-opacity="0.55" stroke-width="2"/>
-    <!-- ponto vermelho -->
     <circle cx="72" cy="76" r="14" fill="url(#dotGlow)" filter="url(#dotBlur)"/>
     <circle cx="72" cy="76" r="7.5" fill="url(#dot)"/>
     <circle cx="69.5" cy="73.5" r="2.2" fill="#ffd9d0" fill-opacity="0.85"/>
   </g>
 
-  <!-- ==================== WORDMARK: URBANA 3D ==================== -->
   <g font-family="'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-weight="800" font-size="74" letter-spacing="14">
-    <!-- extrusão/profundidade -->
     <text x="164" y="103" fill="#05070a" fill-opacity="0.9">URBAN<tspan fill="url(#textGold)">A</tspan></text>
     <text x="164" y="101" fill="#101418">URBAN<tspan fill="#3a2c0c">A</tspan></text>
-    <!-- face metálica -->
     <text x="164" y="98" fill="url(#textMetal)">URBAN<tspan fill="url(#textGold)">A</tspan></text>
-    <!-- brilho superior -->
     <text x="164" y="98" fill="#ffffff" fill-opacity="0.35" transform="translate(0,-1.2)">URBAN<tspan fill="#fff6d8" fill-opacity="0.5">A</tspan></text>
   </g>
 
-  <!-- tagline fina -->
   <text x="170" y="132" font-family="'Segoe UI', Roboto, sans-serif" font-size="15" letter-spacing="9" font-weight="600" fill="#8fa8b8">FPS TÁTICO</text>
 </svg>

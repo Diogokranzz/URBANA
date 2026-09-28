@@ -1,193 +1,94 @@
 # URBANA
 
-FPS tático realista em primeira pessoa feito com **three.js** (WebGL puro, zero build step), rodando direto no navegador. Mapa urbano de fim de tarde, armas icônicas com texturas procedurais no padrão CS:GO, IA humanoide com máquina de estados e áudio 100% sintetizado em tempo real.
+FPS tático urbano em português do Brasil, feito com three.js puro e Node.js sem nenhuma dependência externa em tempo de execução. O jogo roda direto no navegador com ondas de IA armada, carros dirigíveis com turbo e fogo no escapamento, multijogador cooperativo por WebSocket e áudio sintetizado em tempo real, sem nenhum arquivo de som.
 
-## Como jogar
+## Visão geral do projeto
 
-```bash
-node server.js
-# abra http://127.0.0.1:8137
-```
+URBANA é um jogo de tiro em primeira pessoa ambientado em um cruzamento urbano ao fim da tarde. O jogador escolhe um operador entre três classes, enfrenta ondas crescentes de hostis controlados por IA e pode entrar em qualquer carro da cena para dirigir, atropelar inimigos ou usar o turbo para escapar de uma encurralada. O mapa tem prédios com janelas iluminadas, vitrines de loja, postes de luz com luminária real, hidrantes, bancas de jornal, containers, muros perimetrais e faixas de pedestres.
 
-Clique em **INICIAR MISSÃO** (ou pressione `ENTER`) para capturar o mouse. Sobreviva às ondas de hostis.
+Todos os recursos do jogo são gerados por código: as texturas são desenhadas em canvas no carregamento, os sons são sintetizados com WebAudio e os bonecos são construídos por geometria procedural. Não existe download de assets externos, o que mantém o jogo leve, rápido de abrir e fácil de hospedar.
 
-> Privacidade total: o servidor escuta apenas em `127.0.0.1`, nenhum dado do jogador é coletado, armazenado ou transmitido.
+O projeto segue a norma da língua portuguesa do Brasil em toda a interface, nos textos e no código, e não contém nenhum comentário em nenhum arquivo.
 
-## Mira e Sensibilidade (padrão CS:GO)
+## Como executar
 
-O movimento da câmera reproduz exatamente a matemática do Counter-Strike: os counts brutos do mouse são convertidos em graus com `m_yaw`/`m_pitch` de **0,022°/count** (idêntico ao CS:GO), sem aceleração — a Pointer Lock API entrega deltas já crus (*raw input*). O padrão de fábrica é:
+É necessário ter o Node.js 18 ou superior instalado.
 
-| Parâmetro | Valor | Equivalente |
-|---|---|---|
-| Sensibilidade no jogo | **1.0** | com mouse 800 DPI = **800 eDPI**, o "ponto de equilíbrio" do cenário profissional (ideal para controlar o recoil da AK-47) |
-| m_yaw / m_pitch | 0,022°/count | idêntico ao CS:GO (360° = ~41,4 cm @ 800 DPI) |
-| Raw input | Ativado | Pointer Lock entrega deltas brutos, ignorando aceleração do SO |
-| Ajuste em jogo | `[` / `]` | ±0,05 (0,05 a 10) — exibido no HUD |
+1. Abra o terminal na pasta do projeto.
+2. Execute o comando: node server.js
+3. Abra o endereço: localhost na porta 8137 no navegador, com o protocolo http.
 
-> Para calcular: `sens desejada = 800 / (DPI do seu mouse)` mantém a mesma distância física de giro (800 eDPI).
+O servidor escuta apenas em 127.0.0.1 por padrão, ou seja, ninguém fora da sua máquina acessa o jogo. Para liberar o acesso na rede local, use a variável de ambiente URBANA_HOST com o valor 0.0.0.0 antes do comando.
 
-### Zoom 1:1 realista — `zoom_sensitivity_ratio_mouse 0.818933`
-
-No CS:GO o zoom padrão reduz a sensibilidade focando nas bordas de uma tela 4:3 antiga, o que desalinha flicks curtos no centro da tela. O valor **0,818933** é o coeficiente matemático que iguala a distância focal do primeiro zoom da AWP/Scout ao hip-fire — com ele, arrastar o mouse percorre **exatamente o mesmo arco angular** com e sem zoom, mantendo a memória muscular 100% linear entre qualquer arma.
-
-Neste projeto o fator equivalente é aplicado automaticamente ao mirar (ADS), interpolado suavemente conforme o zoom entra:
-
-```
-fator ADS = 0.818933 × (adsFov da arma / fov base 72°)
-```
-
-| Arma | adsFov | Fator em ADS | Sens efetiva (sens 1.0) |
-|---|---|---|---|
-| AK-47 | 58° | 0,818933 × 58/72 ≈ 0,660 | ~0,66 |
-| Desert Eagle | 62° | 0,818933 × 62/72 ≈ 0,705 | ~0,70 |
-| Sniper (luneta) | 16° | 0,818933 × 16/72 ≈ 0,182 | ~0,18 |
-
-Resultado: um flick para a cabeça percorre o mesmo ângulo no mouse de hip-fire **ou** luneta — flicks iguais, mira igual, spray controlável.
-
-## Operadores e escudo
-
-Antes de entrar em combate você escolhe o operador numa vitrine 3D (o mesmo boneco realista do jogo, girando sob luz de estúdio):
-
-| Operador | Escudo | Perk |
-|---|---|---|
-| 🛡️ **BOPE** | 50 | +15 de vida — linha de frente |
-| 🎭 **FACÇÃO** | 25 | +10% velocidade — agilidade urbana |
-| 🎯 **FORÇA DELTA** | 35 | recuo −28% — mira firme |
-
-O **escudo** absorve o dano antes da vida (barra ciano no HUD) e as placas se recarregam entre ondas. O painel **`Q`** mostra o loadout completo com munição e escudo em tempo real.
-
-## Multiplayer co-op (experimental)
-
-Ao escolher o operador você entra automaticamente na **sala co-op**: operadores reais aparecem no mapa como bonecos articulados com nameplate, andam/atiram/falam com você (chat em `T`), e o chip **ONLINE** no topo conta a população da sala. O placar (`TAB`) lista todos os operadores conectados.
-
-- **WebSocket puro (RFC 6455) no mesmo servidor** — zero dependências novas; estados propagados a 12,5 Hz com interpolação suave no cliente
-- **Não é P2P**: todo o tráfego passa pelo servidor da partida (o host vê os IPs)
-
-### Jogar pela internet (amigos fora da sua rede)
-
-```bash
-URBANA_HOST=0.0.0.0 node server.js   # libera na rede — proteja com firewall/túnel
-```
-
-Para a internet pública, recomendado: tunnel SSH (`ssh -R`) ou um VPS + reverse proxy com TLS (`wss://`). O CSP do jogo já permite WebSocket somente para a própria origem.
+A porta padrão é 8137 e o WebSocket do multijogador responde na rota /ws do mesmo endereço, sem depender de bibliotecas externas.
 
 ## Controles
 
-| Tecla | Ação |
-|---|---|
-| `W A S D` | Mover |
-| Mouse | Mirar |
-| Botão direito | Mira de precisão (ADS) |
-| `SHIFT` | Correr |
-| `CTRL` / `C` | Agachar |
-| `ESPAÇO` | Pular |
-| `R` | Recarregar |
-| `1` | AK-47 (principal, automática) |
-| `2` | Desert Eagle .50 (semi, com silenciador) |
-| `4` | MP5-SD (submetralhadora suprimida, 800 RPM) |
-| `5` | Pump 12 (escopeta, 8 projéteis por disparo) |
-| `Q` | Painel de loadout (armas, munição e escudo ao vivo) |
-| `T` | Chat do co-op |
-| `3` | Sniper de precisão (bolt-action, luneta) |
-| `G` / `6` | Granada de fragmentação |
-| `X` | Remover / instalar o supressor da Desert Eagle (animação em tempo real) |
-| `TAB` | Placar da missão (segurar) |
-| `[` / `]` | Sensibilidade do mouse − / + (±0,05) |
-| `V` | Alternar câmera 1ª/3ª pessoa |
-| `ENTER` | Confirmar nos menus |
-| `ESC` | Pausar |
+1. W A S D: mover.
+2. Mouse: mirar, botão esquerdo atira e botão direito mira refinada.
+3. SHIFT: correr a pé e turbo quando estiver dirigindo.
+4. CTRL ou C: agachar.
+5. ESPAÇO: pular.
+6. R: recarregar a arma.
+7. G ou 4: granada.
+8. Teclas 1, 2 e 3: trocar entre AK, Deagle e Sniper.
+9. Teclas 4 e 5: MP5 e Pump.
+10. X: instalar ou remover o supressor da Deagle.
+11. Q: painel de loadout.
+12. E: entrar ou sair do carro mais próximo.
+13. V: câmera em terceira pessoa.
+14. TAB: placar.
+15. T: chat do multijogador.
+16. ESC: pausar.
 
-## Arsenal
+## O carro, o turbo e o escapamento
 
-| Arma | Calibre | Cadência | Dano | Mag | Particularidades |
-|---|---|---|---|---|---|
-| **AK-47** | 7.62×39mm | 600 RPM | 34 (×2,8 cabeça) | 30 | Madeira de verdade (veios procedurais), receptor de aço azulado, carregador banana curvo, freio de boca oblíquo, mira holo |
-| **DESERT EAGLE** | .50 AE | 240 RPM | 62 (×2,4 cabeça) | 7 | Slide massivo facetado, cano hexagonal, **supressor removível** (tecla `X`: mão desrosqueia o tubo em tempo real; aberto dispara o estampo real do .50 AE, silenciado dispara o "pfft" abafado), miras de ferro alinhadas ao ADS |
-| **SNIPER** | .338 Lapua | 45 RPM | 99 (um tiro, um abate) | 5 | Bolt-action animado, luneta grande com objetiva e torreta, **overlay de luneta com retícula mil-dot**, bipé, corpo de polímero verde, spread de 0,0002 rad em ADS |
-| **GRANADA** | frag | — | 180 no epicentro | 4 | Corpo com ranhuras de fragmentação, colher e pino, física com quique, **explosão com bola de fogo, onda de choque e dano em área** |
+Aperte E perto de qualquer carro para assumir a direção. O boneco do jogador senta no banco do motorista, as mãos vão ao volante, que gira de verdade com a direção, e a câmera segue o carro em perseguição com o velocímetro no canto da tela. O carro acelera até cerca de 75 km/h no modo normal, faz ré e colide com postes, hidrantes e muros por toda a área da lataria, não só pelo centro.
 
-### Áudio realista (síntese procedural)
+Segurando SHIFT com W pressionado o turbo entra em ação: os dois canos do escapamento na traseira cospem chamas com núcleo amarelo e halo laranja em tremulação, o som do motor ganha um assobio de turbina com o estalo da ignição, o campo de visão abre, o velocímetro acende em laranja e o teto de velocidade sobe para cerca de 108 km/h.
 
-Cada tiro é composto em 4 camadas para soar como munição real, não "tiro de brinquedo":
+Atropelar hostis em alta velocidade derruba os inimigos com ragdoll capotando, respingo de sangue, som de impacto na lataria e tremor de câmera, rendendo pontos de abate.
 
-1. **Crack** — ruído bandpass agudo curtíssimo (o estouro supersônico)
-2. **Punch** — onda senoidal grave que "bate no peito" (120 Hz na AK, 78 Hz no sniper)
-3. **Body** — ruído médio ressonante do mecanismo
-4. **Tail** — reflexos urbanos com eco decrescente (o sniper tem eco duplo de longa distância)
+## Ondas de IA
 
-A Deagle silenciada substitui tudo por um sopro abafado + click metálico do slide. Explosões, recargas (3 estágios), passos, ricochetes, heartbeat e o vento ambiente são igualmente sintetizados — **zero arquivos de áudio**.
+Os hostis chegam em ondas de dificuldade crescente, todos armados, com pontaria, visão, strafe, recarga, granadas e comportamento de cobertura. A IA desliza lateralmente em paredes, troca o lado do desvio quando fica presa e refaz o destino quando necessário, sem nenhum teleporte. Entre uma onda e outra existe um intervalo curto, o escudo do operador é recarregado e o placar soma bônus de limpeza da onda.
 
-## Personagens
+Ao morrer aparece a deathcard K.I.A. com o dossiê da missão e o botão REIMPLANTAR, que devolve o jogador ao combate com vida, escudo e munição restaurados, mantendo a onda atual.
 
-Os operadores são humanos articulados (~1,8 m) construídos por uma fábrica de meshes com duas variantes:
+## Operadores
 
-- **Policial tático** — uniforme azul-petróleo, capacete balístico com óculos, colete, crachá dourado, luvas táticas e rádio
-- **Bandido de capuz** — moletom com capuz sobre a face sombreada, balaclava, camuflado rasgado, correias no peito, pele diferente
+1. BOPE: colete pesado, cinquenta de escudo extra e postura de choque.
+2. FACÇÃO: movimentação ágil e silenciosa, hostis demoram a notar o jogador.
+3. FORÇA DELTA: recuo reduzido e mira firme, feita para operação noturna.
 
-Ambos têm ombros esféricos, pescoço, nariz, quadril, mãos e botas separadas — com animação procedural de caminhada (pernas alternadas, braços balançando), braço direito apontando a arma ao atacar e respiração no idle.
+A escolha muda a vida máxima, o escudo, a velocidade, o recuo e o material do boneco em terceira pessoa.
 
-## Interface
+## Multijogador cooperativo
 
-- **Menu interativo 3D** — keycaps que inclinam seguindo o cursor e **afundam quando você pressiona a tecla real** no teclado, com SFX de interface; câmera orbitando a cidade ao fundo; parallax da logo
-- **Kill banner 3D** — "HOSTIL ELIMINADO / TIRO NA CABEÇA" com pop em perspectiva (sem killfeed duplicado)
-- **Deathcard 3D** — dossiê K.I.A. com causa da morte, tilt seguindo o mouse, cross médico pulsante, queda de câmera cinematográfica antes do cartão (a arma some da tela)
-- **Placar (TAB)** — seus abates × abates dos hostis, onda atual e pontuação
-- **Luneta** — overlay circular com retícula mil-dot quando o sniper mira
-- HUD tático: minimapa rotativo, bússola, vida/munição, crosshair dinâmico, hitmarkers, vinhetas de dano e vida baixa
+O servidor Node.js embutido roda uma sala cooperativa por WebSocket puro seguindo a norma RFC 6455, sem dependências. Jogadores remotos aparecem como bonecos completos com placas de nome, interpolação suave e caminhada procedural, os tiros remotos rendem tracers, clarão e áudio com pan espacial, e o chat fica na tecla T.
 
-## O mundo
+A antifraude é inteiramente no servidor: limite de velocidade com correção de posição, limite de cadência de tiro por arma, limite de dano alegado, taxa de mensagens com token bucket, sanização de nomes, teto de conexões por IP e cabeçalhos de segurança como CSP, nosniff e bloqueio de frames. Nada é gravado em disco, as salas vivem apenas na memória.
 
-- Cidade com **cruzamento central real**: asfalto com agregado/remendos/manchas de óleo, **calçadas elevadas com meio-fio**, faixas tracejadas, laterais contínuas e **4 faixas de pedestre continentais fora do núcleo do cruzamento**
-- **4 prédios por andar** com fachadas texturizadas (escorridos de água, montantes, peitoril), **janelas acesas aleatórias via emissiveMap alinhado**, vitrines de loja com interior iluminado, telhados com parapeito, ACs e antenas
-- **Carros realistas**: carroceria com capô/porta-malas, para-brisa inclinado, vidros transparentes, para-choques, grade cromada, faróis acesos, lanternas, espelhos, placa, pneus com calotas — posições validadas matematicamente contra todos os colisores (nada atravessa parede)
-- Postes com braço curvado e lente emissiva, hidrantes, bancas de jornal, containers nos pátios, sandbags, tambores e paletes como cobertura
-- Céu com shader de **pôr do sol** (glow + disco no horizonte), névoa quente, sol baixo dourado com sombras longas
+## Arquitetura do código
 
-## Segurança (blindagem)
+1. server.js: servidor estático endurecido com rate limit, bloqueio de dotfiles e resolução canônica de caminhos, além da sala multijogador com antifraude.
+2. src/main.js: loop principal, entrada, câmera, HUD, ondas, granadas, carro com turbo, atropelamento e telas de menu e morte.
+3. src/world.js: construção do mapa, texturas procedurais, iluminação, prédios, postes, carros e colisores.
+4. src/entities.js: fábrica de bonecos operadores, jogador e IA inimiga com ragdoll.
+5. src/weapons.js: viewmodel em primeira pessoa, balística, recuo, mira e supressor.
+6. src/audio.js: síntese de todos os sons, do estouro das armas ao motor do carro.
+7. src/fx.js: tracers, impactos, sangue, cápsulas ejetadas, fumaça e explosões.
+8. src/physics.js: colisão AABB, movimento de cápsula com step up e balística por segmento.
+9. src/net.js: cliente de WebSocket com reconexão automática e interpolação de jogadores remotos.
+10. index.html: telas, HUD, velocímetro e estilos.
+11. vendor/three.module.js: biblioteca three.js r160 vendada localmente, mantida intacta por ser código de terceiros.
 
-O servidor estático inclui hardening completo:
+## Publicação
 
-- **Escuta apenas em `127.0.0.1`** por padrão — inacessível pela rede (até alguém subir com `URBANA_HOST=0.0.0.0`)
-- **CSP restritiva**: `script-src 'self'`, sem objetos, sem frames, sem `base-uri`, `form-action 'none'`
-- **Anti path-traversal**: resolução canônica + `realpathSync` + prefixo da raiz
-- **Allow-list de extensões** e bloqueio de dotfiles (`.git`, `.env`...)
-- **Rate limiting** de 240 req/min por IP (handshakes WebSocket incluídos)
-- Cabeçalhos `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy` bloqueando câmera/microfone/geolocalização
-- **`Cache-Control: no-store`** — nenhuma resposta fica em cache compartilhado
-- Métodos não-GET/HEAD rejeitados; nenhum dado do jogador sai da máquina
+O jogo é um site estático e pode ser publicado em hospedagens como a Vercel ou o GitHub Pages em poucos cliques. Nesse cenário o modo individual funciona por completo; o multijogador exige um servidor Node.js ativo, então para manter o multiplayer no ar é preciso uma hospedagem que rode Node, como Render ou Railway, apontando o cliente para o mesmo endereço.
 
-### Anti-cheat da rede (100% no servidor)
+## Licença
 
-O cliente **nunca** é confiado: o servidor valida tudo e expulsa (`kick`) com motivo:
+Projeto feito por Diogo Kranz. Todos os direitos estão reservados ao autor, que é o único detentor do projeto e de tudo que o compõe. É proibido copiar, reproduzir, redistribuir, vender, modificar ou criar obras derivadas, no todo ou em parte, sem autorização prévia e por escrito do autor. Quem quiser usar qualquer parte deste projeto precisa de permissão expressa de Diogo Kranz.
 
-| Trapaça | Defesa |
-|---|---|
-| Speedhack / teleporte | deslocamento > limite físico em 200 ms é revertido (`snap`); 20 violações = kick |
-| Aimbot implausível | pitch travado em ±1,5 rad |
-| Rapidfire | cadência mínima por arma (`SHOT_MIN`); violações descartadas, 15 = kick |
-| Dano forjado | alegação limitada a 45 por hit, 9 hits/s |
-| Flood de mensagens | 55 msgs/s sustentadas; acima disso = kick |
-| Mensagem gigante | > 2 KB rejeitada; buffer > 16 KB = kick |
-| Nome com XSS/injection | sanitizado (sem `<`, tags, controle) e limitado a 14 chars |
-| Cross-site WS hijacking | handshake só em `/ws` com `Origin` = `Host` |
-| Conexões em massa | máx. 4 sockets simultâneos por IP |
-| Sonho de enxame | salas vivem só na RAM; nada é persistido em disco |
-
-## Arquitetura
-
-```
-index.html      — página, HUD, overlays (menu, luneta, placar, deathcard)
-logo.svg        — logo 3D (mira red dot com bisel dourado) + favicon
-server.js       — servidor estático endurecido (Node puro)
-vendor/         — three.js r160
-src/
-  main.js       — loop, ondas, input, HUD, minimapa, 3ª pessoa, placar, morte
-  world.js      — cidade procedural, luzes, texturas, colisores
-  physics.js    — raycast segmento↔AABB, cápsula com step-up
-  weapons.js    — AK/Deagle/Sniper/granada: viewmodels, recuo, ADS, recarga
-  entities.js   — fábrica de operadores + IA (patrulha→alerta→ataque→cobertura)
-  fx.js         — tracers, sangue de 3 camadas, decals, explosões, casings
-  audio.js      — todos os sons sintetizados na hora
-```
-
-Sem dependências externas em runtime. Todo o conteúdo — texturas de madeira e metal, sangue, sons de tiro — é gerado por código na inicialização.
+Todos os direitos reservados a Diogo Kranz.

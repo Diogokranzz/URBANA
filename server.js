@@ -1,19 +1,3 @@
-// ============================================================
-//  URBANA — servidor estático endurecido + MULTIPLAYER (WebSocket)
-// ============================================================
-//  Medidas de segurança:
-//  - Escuta somente em 127.0.0.1 por padrão (URBANA_HOST para expor)
-//  - Allow-list de extensões (nada de servir arquivos arbitrários)
-//  - Resolução canônica de caminhos (anti path-traversal e symlink)
-//  - Bloqueio de dotfiles (.git, .env etc.)
-//  - Cabeçalhos de segurança: CSP, nosniff, Referrer-Policy, Permissions-Policy
-//  - Rate limiting simples por IP (anti DoS local)
-//  MULTIPLAYER (co-op de presença, WS puro RFC 6455, sem dependências):
-//  - Handshake só na rota /ws e mesma origem (anti cross-site WS hijacking)
-//  - Anti-cheat no servidor: velocidade, cadência de tiro, pitch, taxa de
-//    mensagens (token bucket), dano alegado limitado, caps por IP, sanitização
-//  - Nada é persistido em disco; salas vivem só na RAM
-// ============================================================
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -33,8 +17,6 @@ const types = {
   '.md': 'text/markdown; charset=utf-8',
 };
 
-// Política de Segurança de Conteúdo: scripts/estilos apenas do próprio origin,
-// sem objetos/embeds, sem frames, conecta só em localhost.
 const CSP = [
   "default-src 'self'",
   "script-src 'self'",
@@ -50,10 +32,8 @@ const CSP = [
   "form-action 'none'",
 ].join('; ');
 
-// cache de caminhos já resolvidos e aprovados (perf)
 const okCache = new Set();
 
-// rate limit simples: 240 req/min por IP
 const hits = new Map();
 setInterval(() => hits.clear(), 60_000).unref();
 
@@ -68,13 +48,11 @@ function securityHeaders(res) {
 }
 
 const server = http.createServer((req, res) => {
-  // ---------- rate limit ----------
   const ip = req.socket.remoteAddress || '?';
   const n = (hits.get(ip) || 0) + 1;
   hits.set(ip, n);
   if (n > 240) { res.writeHead(429); return res.end('Too Many Requests'); }
 
-  // ---------- método ----------
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405, { Allow: 'GET, HEAD' });
     return res.end();
@@ -89,20 +67,17 @@ const server = http.createServer((req, res) => {
   }
   if (p === '/') p = '/index.html';
 
-  // ---------- bloqueio de dotfiles e extensões fora da allow-list ----------
   const base = path.basename(p);
   if (base.startsWith('.')) { res.writeHead(403); return res.end(); }
   const ext = path.extname(p).toLowerCase();
   if (!types[ext]) { res.writeHead(404); return res.end(); }
 
-  // ---------- resolução canônica (anti traversal) ----------
   const file = path.resolve(root, '.' + path.posix.normalize('/' + p));
   if (!file.startsWith(root + path.sep) && file !== root) { res.writeHead(403); return res.end(); }
   if (!okCache.has(file)) {
     let st;
     try { st = fs.statSync(file); } catch { res.writeHead(404); return res.end('404'); }
     if (!st.isFile()) { res.writeHead(404); return res.end(); }
-    // realPath confirma que não há symlink saindo da raiz
     if (!fs.realpathSync(file).startsWith(root)) { res.writeHead(403); return res.end(); }
     okCache.add(file);
   }
@@ -117,7 +92,7 @@ const server = http.createServer((req, res) => {
     res.end(req.method === 'HEAD' ? undefined : data);
   });
 });
-server.on('upgrade', handleUpgrade);   // multiplayer: handshake WS em /ws
+server.on('upgrade', handleUpgrade);
 server.listen(PORT, process.env.URBANA_HOST || '127.0.0.1', () => {
   const host = process.env.URBANA_HOST || '127.0.0.1';
   console.log(`URBANA rodando em http://${host === '0.0.0.0' ? '<ip-local>' : host}:${PORT}`);
@@ -125,25 +100,21 @@ server.listen(PORT, process.env.URBANA_HOST || '127.0.0.1', () => {
   if (host === '127.0.0.1') console.log('Servidor local apenas — nenhum dado sai desta máquina.');
 });
 
-// ============================================================
-//  MULTIPLAYER — WebSocket puro (RFC 6455) + sala co-op + anti-cheat
-// ============================================================
 const crypto = require('crypto');
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
-const MAX_MSG = 2048;              // bytes por mensagem
+const MAX_MSG = 2048;
 const MAX_NAME = 14;
-const MAX_PER_IP = 4;             // conexões simultâneas por IP
-const TICK_MS = 80;                // broadcast de estados (12,5 Hz)
+const MAX_PER_IP = 4;
+const TICK_MS = 80;
 
-// limites anti-cheat
-const MAX_SPEED = 14;             // m/s horizontal (sprint + jump com folga)
+const MAX_SPEED = 14;
 const MAX_PITCH = 1.5;
-const MSG_RATE = 55;              // msgs/s sustentadas por jogador
+const MSG_RATE = 55;
 const SHOT_MIN = { ak: 0.085, pistol: 0.2, sniper: 1.2, smg: 0.06, shotgun: 0.75 };
 const HIT_DMG_MAX = 45;
-const HIT_RATE = 9;               // alegações de dano/s
+const HIT_RATE = 9;
 
-const rooms = { players: new Map() };   // id -> player
+const rooms = { players: new Map() };
 const ipCount = new Map();
 let nextId = 1;
 
@@ -151,7 +122,6 @@ function wsAccept(key) {
   return crypto.createHash('sha1').update(key + WS_GUID).digest('base64');
 }
 
-// ---- framing RFC 6455 ----
 function encodeFrame(str) {
   const payload = Buffer.from(str);
   const len = payload.length;
@@ -162,7 +132,6 @@ function encodeFrame(str) {
   return Buffer.concat([head, payload]);
 }
 
-// decodifica o buffer acumulado; retorna { frames:[str], rest:Buffer }
 function decodeFrames(buf) {
   const frames = [];
   let off = 0;
@@ -178,7 +147,6 @@ function decodeFrames(buf) {
     if (buf.length - pos < len + (masked ? 4 : 0)) break;
     let payload;
     if (masked) {
-      // cliente sempre máscara: [mask(4)][payload] — pula a máscara antes de ler
       const mask = buf.slice(pos, pos + 4);
       payload = Buffer.from(buf.slice(pos + 4, pos + 4 + len));
       for (let i = 0; i < payload.length; i++) payload[i] ^= mask[i & 3];
@@ -189,7 +157,7 @@ function decodeFrames(buf) {
     pos += len;
     off = pos;
     if (opcode === 8) return { frames, rest: null, close: true };
-    if (opcode === 9) continue;                       // ping (respondemos no baixo nível)
+    if (opcode === 9) continue;
     if (opcode === 1) frames.push(payload.toString('utf8'));
   }
   return { frames, rest: buf.slice(off) };
@@ -197,7 +165,7 @@ function decodeFrames(buf) {
 
 function wsSend(sock, str) {
   if (sock.destroyed) return;
-  try { sock.write(encodeFrame(str)); } catch { /* caiu; limpeza no close */ }
+  try { sock.write(encodeFrame(str)); } catch {   }
 }
 const broadcast = (str, exceptId) => {
   for (const [id, p] of rooms.players) if (id !== exceptId) wsSend(p.sock, str);
@@ -212,15 +180,14 @@ function boardPayload() {
 }
 
 function handleUpgrade(req, socket) {
-  // ---------- gate: rota, origem, rate, caps ----------
   if (req.url !== '/ws') { socket.destroy(); return; }
   const ip = req.socket.remoteAddress || '?';
-  const n = (hits.get(ip) || 0) + 1; hits.set(ip, n);          // upgrade conta no rate limit
+  const n = (hits.get(ip) || 0) + 1; hits.set(ip, n);
   if ((ipCount.get(ip) || 0) >= MAX_PER_IP) { socket.destroy(); return; }
   const key = req.headers['sec-websocket-key'];
   const origin = req.headers.origin || '';
   const host = req.headers.host || '';
-  if (!key || !origin.endsWith(host)) { socket.destroy(); return; }   // mesma origem only
+  if (!key || !origin.endsWith(host)) { socket.destroy(); return; }
 
   socket.write(
     'HTTP/1.1 101 Switching Protocols\r\n' +
@@ -233,7 +200,6 @@ function handleUpgrade(req, socket) {
     id: nextId++, sock: socket, ip, name: 'OPERADOR', cls: 'police',
     kills: 0, pos: [0, 0, 0], yaw: 0, pitch: 0, slot: 0, hp: 100,
     buf: Buffer.alloc(0), lastState: 0,
-    // anti-cheat
     msgTimes: [], shotLast: 0, shotVio: 0, speedVio: 0, hitTimes: [],
     helloDone: false,
   };
@@ -252,7 +218,7 @@ function leave(p) {
 
 function kick(p, why) {
   wsSend(p.sock, JSON.stringify({ t: 'kick', why }));
-  setTimeout(() => { try { p.sock.destroy(); } catch {} }, 60);   // deixa o frame sair
+  setTimeout(() => { try { p.sock.destroy(); } catch {} }, 60);
   leave(p);
 }
 
@@ -297,12 +263,10 @@ function handleMessage(p, m) {
       if (!Array.isArray(m.p) || m.p.length !== 3) return;
       const [x, y, z] = m.p;
       if (![x, y, z, m.yaw, m.pitch].every(Number.isFinite)) return;
-      // ---- anti-cheat: velocidade e pitch ----
       const dx = x - p.pos[0], dz = z - p.pos[2];
       const dist = Math.hypot(dx, dz);
-      if (p.lastState && dist > MAX_SPEED * 0.2) {          // > limite em 200ms
+      if (p.lastState && dist > MAX_SPEED * 0.2) {
         if (++p.speedVio > 20) return kick(p, 'velocidade impossível');
-        // snap de volta (não propaga teleporte)
         wsSend(p.sock, JSON.stringify({ t: 'snap', p: p.pos }));
         return;
       }
@@ -321,7 +285,7 @@ function handleMessage(p, m) {
       const min = (SHOT_MIN[m.sfx] || 0.2) * 1000;
       if (now - p.shotLast < min * 0.7) {
         if (++p.shotVio > 15) return kick(p, 'cadência de tiro impossível');
-        return;                                              // descarta, não propaga
+        return;
       }
       p.shotVio = Math.max(0, p.shotVio - 1);
       p.shotLast = now;
@@ -351,7 +315,6 @@ function handleMessage(p, m) {
   }
 }
 
-// tick: propaga estados compactados
 setInterval(() => {
   if (rooms.players.size === 0) return;
   const s = [];
