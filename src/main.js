@@ -324,16 +324,6 @@ function saveRecordIfNeeded() {
   } catch {}
 }
 
-function showRecordLine() {
-  const el = document.getElementById('record-line');
-  if (!el) return;
-  const r = loadRecord();
-  if (r && r.score > 0) {
-    el.textContent = `RECORDE: ${r.score} PONTOS · ONDA ${r.wave} · ${r.kills} ABATES`;
-    el.classList.remove('hidden');
-  }
-}
-
 function updHud() {
   const hp = Math.round(player.health);
   hud.health.textContent = hp;
@@ -646,28 +636,27 @@ function updateVehicle(dt) {
   }
   audio.turboSet(turboOn);
   const moveVec = new THREE.Vector3(fx, 0, fz).multiplyScalar(vehState.speed * dt);
-  const np = c.position.clone().add(moveVec);
-  const blocked = (() => {
-    let box = null;
-    for (const b of phys.colliders) { if (b.carGroup === c) { box = b; break; } }
-    if (!box) return false;
-    const halfW = (box.max.x - box.min.x) / 2, halfD = (box.max.z - box.min.z) / 2;
+  const carHalfX = 2.2, carHalfZ = 2.6;
+  const hitsAt = (px, pz) => {
     for (const b of phys.colliders) {
-      if (b === box) continue;
+      if (b.carGroup === c) continue;
       if (b.max.y <= 0.35) continue;
-      if (np.x + halfW > b.min.x && np.x - halfW < b.max.x &&
-          np.z + halfD > b.min.z && np.z - halfD < b.max.z) return true;
+      if (px + carHalfX > b.min.x && px - carHalfX < b.max.x &&
+          pz + carHalfZ > b.min.z && pz - carHalfZ < b.max.z) return true;
     }
     return false;
-  })();
-  if (blocked) { vehState.speed *= -0.25; audio.engineHit(); vehState.shake = Math.max(vehState.shake, 0.3); }
-  else c.position.copy(np);
+  };
+  const estavaLivre = !hitsAt(c.position.x, c.position.z);
+  const nx = c.position.x + moveVec.x, nz = c.position.z + moveVec.z;
+  let moveu = false;
+  if (!hitsAt(nx, nz)) { c.position.x = nx; c.position.z = nz; moveu = true; }
+  else if (!hitsAt(nx, c.position.z)) { c.position.x = nx; moveu = true; }
+  else if (!hitsAt(c.position.x, nz)) { c.position.z = nz; moveu = true; }
+  if (!moveu && estavaLivre) { vehState.speed *= -0.25; audio.engineHit(); vehState.shake = Math.max(vehState.shake, 0.3); }
   for (const b of phys.colliders) {
     if (b.carGroup === c) {
-      const cos = Math.abs(Math.cos(c.rotation.y)), sin = Math.abs(Math.sin(c.rotation.y));
-      const hw = (2.1 * cos + 4.9 * sin) / 2, hd = (2.1 * sin + 4.9 * cos) / 2;
-      b.min.set(c.position.x - hw, 0, c.position.z - hd);
-      b.max.set(c.position.x + hw, 2.0, c.position.z + hd);
+      b.min.set(c.position.x - carHalfX, 0, c.position.z - carHalfZ);
+      b.max.set(c.position.x + carHalfX, 2.0, c.position.z + carHalfZ);
     }
   }
   player.pos.copy(c.position);
@@ -685,6 +674,8 @@ function updateSpeedo() {
   const driving = !!vehicle;
   if (!spSpeedo) return;
   spSpeedo.classList.toggle('hidden', !driving);
+  const br = document.getElementById('bottom-right');
+  if (br) br.classList.toggle('driving', driving);
   if (!driving) return;
   const kmh = Math.round(Math.abs(vehState.speed) * 3.6);
   spKmh.textContent = kmh;
@@ -1543,7 +1534,6 @@ function initTouchControls() {
 }
 
 showOverlay('start');
-showRecordLine();
 applyQuality();
 requestAnimationFrame(frame);
 

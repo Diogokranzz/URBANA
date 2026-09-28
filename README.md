@@ -107,7 +107,7 @@ O servidor Node.js embutido roda uma sala cooperativa por WebSocket puro seguind
 
 A antifraude é inteiramente no servidor: limite de velocidade com correção de posição, limite de cadência de tiro por arma, limite de dano alegado, taxa de mensagens com token bucket, sanitização de nomes, teto de conexões por IP e cabeçalhos de segurança como CSP, nosniff e bloqueio de frames. Nada é gravado em disco, as salas vivem apenas na memória.
 
-O recorde pessoal do jogador fica salvo no próprio navegador: a melhor pontuação, a maior onda e o total de abates aparecem em dourado no menu inicial, prontos para serem batidos.
+O progresso da sessão continua vivo na interface durante o combate, e a melhor marca alcançada fica salva no próprio navegador, pronta para ser batida.
 
 <img src="docs/divider.svg" width="100%">
 

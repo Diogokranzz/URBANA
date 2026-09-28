@@ -155,6 +155,8 @@
   #bottom-right {
     position: absolute; right: 26px; bottom: 24px; text-align: right;
   }
+  #bottom-right.driving #ammo { display: none; }
+  #bottom-right.driving #weapon { position: absolute; right: 151px; bottom: 36px; transform: translateX(50%); text-align: center; white-space: nowrap; }
   #ammo {
     font-size: 38px; font-weight: 700; color: #fff;
     text-shadow: 0 0 6px rgba(0,0,0,0.85); font-variant-numeric: tabular-nums;
@@ -365,7 +367,7 @@
   #speedo.reversing #sp-kmh { color: #ff6b57; text-shadow: 0 0 18px rgba(255,75,56,0.4), 0 2px 4px #000; }
   #speedo .sp-unit { font-size: 10px; letter-spacing: 3px; color: #8fa8b8; }
   #speedo .sp-bar {
-    width: 120px; height: 8px; background: rgba(0,0,0,0.55);
+    width: 64px; height: 6px; background: rgba(0,0,0,0.55);
     border: 1px solid rgba(255,255,255,0.22); border-radius: 2px; overflow: hidden;
   }
   #sp-fill {
@@ -401,12 +403,26 @@
   }
   #quality span { font-size: 10px; letter-spacing: 3px; color: #8fa8b8; }
   #quality button {
-    background: #1d2328; color: #b7c4cc; border: 1px solid rgba(255,255,255,0.14);
-    border-radius: 5px; font-size: 11px; font-weight: 700; letter-spacing: 2px;
-    padding: 5px 12px; cursor: pointer; transition: background 0.15s, color 0.15s;
+    position: relative;
+    background: linear-gradient(180deg, #2c343c, #171c21 55%, #101418);
+    color: #b7c4cc; border: 1px solid rgba(255,255,255,0.16);
+    border-bottom-color: rgba(0,0,0,0.7); border-right-color: rgba(0,0,0,0.45);
+    box-shadow: 0 4px 0 #07090b, 0 6px 10px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.16);
+    border-radius: 6px; font-size: 11px; font-weight: 700; letter-spacing: 2px;
+    padding: 6px 14px; cursor: pointer; transform-style: preserve-3d;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s, color 0.15s;
   }
-  #quality button:hover { background: #2b333a; }
-  #quality button.on { background: #e8c35a; color: #14181c; border-color: #e8c35a; }
+  #quality button:hover { background: linear-gradient(180deg, #38424c, #1c232a 55%, #12171c); color: #e8eef2; }
+  #quality button:active { transform: translateY(3px); box-shadow: 0 1px 0 #07090b, 0 2px 5px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1); }
+  #quality button.on {
+    background: linear-gradient(180deg, #ffd873, #e8c35a 55%, #c79e3a);
+    color: #14181c; border-color: rgba(255,230,150,0.9);
+    border-bottom-color: #7a5c14; border-right-color: #7a5c14;
+    box-shadow: 0 4px 0 #6b500f, 0 6px 14px rgba(232,195,90,0.35), inset 0 1px 0 rgba(255,255,255,0.55);
+    text-shadow: 0 1px 0 rgba(255,255,255,0.35);
+  }
+  #quality button.on:hover { background: linear-gradient(180deg, #ffe18c, #f0cd6a 55%, #cfa543); }
+  #quality button.on:active { transform: translateY(3px); box-shadow: 0 1px 0 #6b500f, 0 2px 6px rgba(232,195,90,0.3), inset 0 1px 0 rgba(255,255,255,0.4); }
 
   #touch-ui { position: fixed; inset: 0; z-index: 20; pointer-events: none; display: none; }
   #touch-ui.on { display: block; }
@@ -448,10 +464,6 @@
     user-select: none; pointer-events: none;
   }
   .screen .sub { font-size: 14px; letter-spacing: 4px; color: #8fa8b8; margin-bottom: 28px; }
-  #record-line {
-    font-size: 13px; letter-spacing: 3px; color: #ffd24a; margin-bottom: 14px;
-    text-shadow: 0 0 12px rgba(232,195,90,0.35), 0 1px 2px #000;
-  }
   #screen-start .logo { margin-bottom: 34px; }
   .screen h1 { font-size: 34px; letter-spacing: 10px; font-weight: 300; color: #e8eef2; }
 
@@ -706,7 +718,6 @@
 
     <div id="screen-start" class="screen">
       <img src="logo.svg" alt="URBANA" class="logo">
-      <div id="record-line" class="hidden"></div>
       <div id="controls3d">
         <div class="row" data-key="KeyW,KeyA,KeyS,KeyD"><span class="cap">W A S D</span><span class="desc">Mover</span></div>
         <div class="row" data-key="Mouse0,Mouse2"><span class="cap">MOUSE</span><span class="desc">Mirar</span></div>
