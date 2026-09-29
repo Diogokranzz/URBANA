@@ -1314,10 +1314,34 @@ function initMenuInteractivity() {
 const forceTouch = new URLSearchParams(location.search).has('touch');
 initMenuInteractivity();
 initQualityUi();
-if (forceTouch || ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || (window.matchMedia && matchMedia('(pointer: coarse)').matches)) {
+// Celular/tablet real: mostra aviso "só no PC" e não inicia o jogo lá.
+// (?touch=1 mantém os controles para testes; ?mobile=1 força o aviso para visualização.)
+const isHandheld = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+  || (window.matchMedia && matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches);
+const pcOnly = (isHandheld && !forceTouch) || new URLSearchParams(location.search).has('mobile');
+if (pcOnly) {
+  const gate = document.getElementById('pc-only');
+  if (gate) {
+    gate.classList.remove('hidden');
+    const keepHidden = () => {
+      gate.classList.remove('hidden');
+      const ov = document.getElementById('overlay');
+      if (ov) ov.classList.add('hidden');
+    };
+    keepHidden();
+    setInterval(keepHidden, 500);
+    const cp = document.getElementById('pc-copy');
+    if (cp) cp.addEventListener('click', () => {
+      const ok = () => { cp.textContent = 'LINK COPIADO ✓'; };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText('https://diogokranzz.github.io/URBANA/').then(ok, ok);
+      else ok();
+    });
+  }
+}
+if (!pcOnly && (forceTouch || ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || (window.matchMedia && matchMedia('(pointer: coarse)').matches))) {
   document.body.classList.add('touch');
 }
-initTouchControls();
+if (!pcOnly) initTouchControls();
 
 let opRenderer = null, opScene = null, opCam = null, opMesh = null, opSpin = 0, opKind = 'police';
 

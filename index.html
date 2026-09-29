@@ -426,6 +426,31 @@
 
   #touch-ui { position: fixed; inset: 0; z-index: 20; pointer-events: none; display: none; }
   #touch-ui.on { display: block; }
+  #pc-only {
+    position: fixed; inset: 0; z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at 50% 30%, #16202a 0%, #06090c 70%);
+    text-align: center; padding: 24px;
+  }
+  #pc-only .pc-box { max-width: 420px; }
+  #pc-only .pc-ico { font-size: 54px; margin-bottom: 10px; }
+  #pc-only h1 { font-size: 22px; letter-spacing: 6px; color: #e8c35a; margin-bottom: 14px; text-shadow: 0 2px 8px rgba(0,0,0,0.6); }
+  #pc-only p { color: #9fb2bd; font-size: 14px; line-height: 1.7; letter-spacing: 0.5px; }
+  #pc-only .pc-url {
+    font-size: 16px; letter-spacing: 1px; color: #eef2f4;
+    background: rgba(10,14,17,0.7); border: 1px solid rgba(232,195,90,0.4);
+    border-radius: 8px; padding: 12px 16px; margin: 16px auto;
+    width: fit-content; max-width: 100%;
+    font-weight: 700; word-break: break-all;
+  }
+  #pc-only .pc-btn {
+    background: linear-gradient(180deg, #ffe18c, #f0cd6a 55%, #cfa543);
+    color: #211a06; border: 0; border-radius: 8px;
+    font-weight: 800; letter-spacing: 2px; font-size: 13px;
+    padding: 12px 28px; cursor: pointer; box-shadow: 0 3px 0 #6b500f;
+  }
+  #pc-only .pc-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #6b500f; }
+  #pc-only .pc-note { margin-top: 18px; font-size: 10.5px; letter-spacing: 2px; color: #5d6b74; }
   #touch-ui .tbtn {
     position: absolute; pointer-events: auto; touch-action: none;
     display: flex; align-items: center; justify-content: center;
@@ -695,6 +720,17 @@
 <body>
   <div id="game"></div>
 
+  <div id="pc-only" class="hidden">
+    <div class="pc-box">
+      <div class="pc-ico">💻</div>
+      <h1>URBANA É SÓ NO PC</h1>
+      <p>Você está no celular e o jogo precisa de teclado e mouse.<br>Abra este mesmo site no computador:</p>
+      <div class="pc-url">diogokranzz.github.io/URBANA</div>
+      <button id="pc-copy" class="pc-btn">COPIAR LINK</button>
+      <p class="pc-note">VERSÃO PC RODANDO 100% · FPS TÁTICO COMPLETO</p>
+    </div>
+  </div>
+
   <div id="touch-ui">
     <div id="touch-look"></div>
     <div id="touch-stick"><div id="touch-knob"></div></div>
@@ -821,7 +857,7 @@
 
     <div id="screen-start" class="screen">
       <img src="logo.svg" alt="URBANA" class="logo">
-      <div id="build-tag" style="font-size:9px;letter-spacing:3px;color:#5d6b74;margin-top:2px;">BUILD v8 · TOQUE</div>
+      <div id="build-tag" style="font-size:9px;letter-spacing:3px;color:#5d6b74;margin-top:2px;">BUILD v9 · PC</div>
       <div id="controls3d">
         <div class="row" data-key="KeyW,KeyA,KeyS,KeyD"><span class="cap">W A S D</span><span class="desc">Mover</span></div>
         <div class="row" data-key="Mouse0,Mouse2"><span class="cap">MOUSE</span><span class="desc">Mirar</span></div>
