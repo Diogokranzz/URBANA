@@ -18,7 +18,7 @@
 <meta name="theme-color" content="#e8c35a">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="shortcut icon" type="image/svg+xml" href="favicon.svg">
-<link rel="apple-touch-icon" href="favicon.svg">
+<link rel="apple-touch-icon" href="icon192.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -452,6 +452,8 @@
   #touch-fire.held::after { content: ''; position: absolute; inset: 12px; border-radius: 50%; background: rgba(232,195,90,0.25); animation: firePulse 0.9s infinite; }
   @keyframes firePulse { 0%,100% { opacity: 0.25; } 50% { opacity: 0.65; } }
   #touch-ads { right: 132px; bottom: 100px; width: 62px; height: 62px; }
+  #tb-jump { font-size: 9px; }
+  #tb-pause { font-size: 13px; letter-spacing: 0; }
   #tb-crouch { right: 150px; bottom: 262px; width: 56px; height: 56px; }
   #tb-reload { right: 132px; bottom: 168px; width: 56px; height: 56px; }
   #tb-grenade { right: 36px; bottom: 200px; width: 56px; height: 56px; }
@@ -478,8 +480,11 @@
   #tc-drive { right: 24px; bottom: 22px; gap: 10px; }
   #tc-foot { left: 50%; transform: translateX(-50%); bottom: 18px; }
   body.touch #minimap-wrap { top: 12px; right: 12px; transform: scale(0.72); transform-origin: top right; opacity: 0.82; }
-  body.touch #bottom-right { right: 12px; bottom: 14px; transform: scale(0.82); transform-origin: right bottom; }
-  body.touch #bottom-right #hud-weaponbar { flex-wrap: wrap; justify-content: flex-end; max-width: 62vw; }
+  body.touch #bottom-right { right: 12px; bottom: 60px; transform: scale(0.82); transform-origin: right bottom; }
+  #touch-ui #hud-weaponbar {
+    position: absolute; right: 12px; bottom: 12px;
+    flex-wrap: wrap; justify-content: flex-end; max-width: 62vw; gap: 6px;
+  }
   body.touch #bottom-left { left: 12px; bottom: 90px; transform: scale(0.82); transform-origin: left bottom; }
   body.touch #tc-foot { bottom: 14px; left: 24px; transform: none; }
   body.touch #hud-keyhelp { display: none !important; }
@@ -701,6 +706,8 @@
     <div class="tcluster" id="tc-foot">
       <div class="tbtn" data-k="KeyV" style="width:56px; height:56px;">CAM</div>
       <div class="tbtn" data-k="KeyQ" style="width:86px; height:56px;">ARSENAL</div>
+      <div class="tbtn" data-k="Space" id="tb-jump" style="width:56px; height:56px;">PULAR</div>
+      <div class="tbtn" id="tb-pause" style="width:56px; height:56px;">II</div>
     </div>
     <div class="tcluster" id="tc-drive">
       <div class="tbtn" data-k="KeyE" style="width:58px; height:58px;">SAIR</div>
@@ -814,6 +821,7 @@
 
     <div id="screen-start" class="screen">
       <img src="logo.svg" alt="URBANA" class="logo">
+      <div id="build-tag" style="font-size:9px;letter-spacing:3px;color:#5d6b74;margin-top:2px;">BUILD v8 · TOQUE</div>
       <div id="controls3d">
         <div class="row" data-key="KeyW,KeyA,KeyS,KeyD"><span class="cap">W A S D</span><span class="desc">Mover</span></div>
         <div class="row" data-key="Mouse0,Mouse2"><span class="cap">MOUSE</span><span class="desc">Mirar</span></div>
@@ -830,7 +838,7 @@
         <div class="row" data-key="ShiftLeft"><span class="cap">SHIFT (NO CARRO)</span><span class="desc">Turbo com fogo no escapamento</span></div>
         <div class="row" data-key="Escape"><span class="cap">ESC</span><span class="desc">Pausar</span></div>
       </div><br>
-      <div id="touch-tip"><b>Celular detectado:</b> joystick à esquerda move, arraste na tela para mirar e atirar. Botões de ação no lado direito da tela.</div>
+      <div id="touch-tip"><b>Celular detectado:</b> joystick à esquerda move, arraste no lado direito para mirar. Atire no botão FOGO · barra embaixo troca de arma.</div>
       <button id="btn-start" class="btn">INICIAR MISSÃO</button>
       <div id="quality"><span>QUALIDADE</span><button data-q="baixa">BAIXA</button><button data-q="media" class="on">MÉDIA</button><button data-q="alta">ALTA</button></div>
     </div>

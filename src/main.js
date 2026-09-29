@@ -109,7 +109,7 @@ let chatOpen = false;
 let touchMode = false;
 let touchFiring = false;
 function armTouchActivation() {
-  const tapTargets = Array.from(document.querySelectorAll('#overlay .btn, #quality button, .op-card'));
+  const tapTargets = Array.from(document.querySelectorAll('#overlay .btn, #quality button, .op-card, #hud-weaponbar .wchip'));
   tapTargets.forEach(el => {
     if (el.__tapArmed) return;
     el.__tapArmed = true;
@@ -1514,7 +1514,10 @@ window.__fpsDebug = {
 
 function initTouchWeaponBar() {
   const bar = document.getElementById('hud-weaponbar');
-  if (!bar) return;
+  const tui = document.getElementById('touch-ui');
+  if (!bar || !tui) return;
+  // Move para dentro do #touch-ui (z-20): dentro de #hud (z-10) o touch-look engoliria os toques.
+  if (bar.parentElement !== tui) tui.appendChild(bar);
   bar.style.display = 'flex';
   const build = () => {
     const defs = weapons.defs.map((d, i) => ({ d, i })).filter(x => [0, 1, 2, 4, 5].includes(x.i));
@@ -1580,13 +1583,34 @@ function initTouchControls() {
 
   ui.querySelectorAll('.tbtn').forEach(btn => {
     const code = btn.dataset.k;
-    const down = e => { e.preventDefault(); btn.__down = true; keys[code] = true; btn.classList.add('held'); if (window.__uiSetKeyVisual) window.__uiSetKeyVisual(code, true); if (code === 'KeyQ' && state.running && !state.over) toggleLoadout(); };
-    const up = e => { if (!btn.__down) return; e.preventDefault(); btn.__down = false; keys[code] = false; btn.classList.remove('held'); if (window.__uiSetKeyVisual) window.__uiSetKeyVisual(code, false); };
-    btn.addEventListener('touchcancel', () => { btn.__down = false; keys[code] = false; btn.classList.remove('held'); });
+    // Ações event-driven (não são polling de tecla): disparam no toque.
+    const tapActions = {
+      KeyR: () => weapons.startReload(),
+      KeyG: () => tryThrowGrenade(),
+      KeyV: () => toggleThirdPerson(),
+      KeyE: () => { vehicle ? exitVehicle() : enterVehicle(); },
+    };
+    const down = e => {
+      e.preventDefault(); btn.__down = true; btn.classList.add('held');
+      if (tapActions[code]) { if (state.running && !state.over && !state.paused) tapActions[code](); }
+      else keys[code] = true;
+      if (window.__uiSetKeyVisual) window.__uiSetKeyVisual(code, true);
+      if (code === 'KeyQ' && state.running && !state.over) toggleLoadout();
+    };
+    const up = e => { if (!btn.__down) return; e.preventDefault(); btn.__down = false; if (!tapActions[code]) keys[code] = false; btn.classList.remove('held'); if (window.__uiSetKeyVisual) window.__uiSetKeyVisual(code, false); };
+    btn.addEventListener('touchcancel', () => { btn.__down = false; if (!tapActions[code]) keys[code] = false; btn.classList.remove('held'); });
     btn.addEventListener('touchstart', down, { passive: false });
     btn.addEventListener('touchend', up, { passive: false });
     btn.addEventListener('touchcancel', up, { passive: false });
   });
+
+  const pauseBtn = document.getElementById('tb-pause');
+  if (pauseBtn) {
+    pauseBtn.addEventListener('touchstart', e => {
+      e.preventDefault();
+      if (state.running && !state.over && !state.paused) { state.paused = true; showOverlay('pause'); }
+    }, { passive: false });
+  }
 
   stick.addEventListener('touchstart', e => {
     const t = e.changedTouches[0];
@@ -1623,7 +1647,6 @@ function initTouchControls() {
   look.addEventListener('touchstart', e => {
     const t = e.changedTouches[0];
     lookId = t.identifier; lookX = t.clientX; lookY = t.clientY;
-    if (state.running && !state.over) { touchFiring = true; mouseDown = true; }
     e.preventDefault();
   }, { passive: false });
   look.addEventListener('touchmove', e => {
@@ -1634,24 +1657,39 @@ function initTouchControls() {
     }
     e.preventDefault();
   }, { passive: false });
-  const lookEnd = e => { for (const t of e.changedTouches) if (t.identifier === lookId) { lookId = null; touchFiring = false; mouseDown = false; firedThisPress = false; } };
+  const lookEnd = e => { for (const t of e.changedTouches) if (t.identifier === lookId) lookId = null; };
   look.addEventListener('touchend', lookEnd);
   look.addEventListener('touchcancel', lookEnd);
 
-  if (fire) {
-    const fireDown = e => { e.preventDefault(); fire.classList.add('held'); touchFiring = true; mouseDown = true; };
-    const fireUp = e => { e.preventDefault(); fire.classList.remove('held'); touchFiring = false; mouseDown = false; firedThisPress = false; };
-    fire.addEventListener('touchstart', fireDown, { passive: false });
-    fire.addEventListener('touchend', fireUp, { passive: false });
-    fire.addEventListener('touchcancel', fireUp, { passive: false });
-  }
-  if (ads) {
-    const adsDown = e => { e.preventDefault(); ads.classList.add('held'); mouse2Down = true; };
-    const adsUp = e => { e.preventDefault(); ads.classList.remove('held'); mouse2Down = false; };
-    ads.addEventListener('touchstart', adsDown, { passive: false });
-    ads.addEventListener('touchend', adsUp, { passive: false });
-    ads.addEventListener('touchcancel', adsUp, { passive: false });
-  }
+  // FOGO e MIRA também giram a câmera enquanto pressionados (mirar atirando).
+  const dragAim = (el, onDown, onUp) => {
+    if (!el) return;
+    let dragId = null, lastX = 0, lastY = 0;
+    el.addEventListener('touchstart', e => {
+      const t = e.changedTouches[0];
+      dragId = t.identifier; lastX = t.clientX; lastY = t.clientY;
+      onDown();
+      e.preventDefault();
+    }, { passive: false });
+    el.addEventListener('touchmove', e => {
+      for (const t of e.changedTouches) {
+        if (t.identifier !== dragId) continue;
+        applyLookDelta(t.clientX - lastX, t.clientY - lastY);
+        lastX = t.clientX; lastY = t.clientY;
+      }
+      e.preventDefault();
+    }, { passive: false });
+    const end = e => { for (const t of e.changedTouches) if (t.identifier === dragId) { dragId = null; onUp(); } };
+    el.addEventListener('touchend', end);
+    el.addEventListener('touchcancel', end);
+  };
+
+  dragAim(fire,
+    () => { fire.classList.add('held'); touchFiring = true; mouseDown = true; },
+    () => { fire.classList.remove('held'); touchFiring = false; mouseDown = false; firedThisPress = false; });
+  dragAim(ads,
+    () => { ads.classList.add('held'); mouse2Down = true; },
+    () => { ads.classList.remove('held'); mouse2Down = false; });
 
   const lookFirstTouch = e => { if (e.cancelable) e.preventDefault(); };
   look.addEventListener('touchstart', lookFirstTouch, { passive: false });
