@@ -34,6 +34,7 @@
   .hidden { display: none !important; }
 
   #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+  body.menu-aberto #top-center { display: none; }
 
   #crosshair {
     --gap: 10px;
@@ -857,7 +858,6 @@
 
     <div id="screen-start" class="screen">
       <img src="logo.svg" alt="URBANA" class="logo">
-      <div id="build-tag" style="font-size:9px;letter-spacing:3px;color:#5d6b74;margin-top:2px;">BUILD v9 · PC</div>
       <div id="controls3d">
         <div class="row" data-key="KeyW,KeyA,KeyS,KeyD"><span class="cap">W A S D</span><span class="desc">Mover</span></div>
         <div class="row" data-key="Mouse0,Mouse2"><span class="cap">MOUSE</span><span class="desc">Mirar</span></div>

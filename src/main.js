@@ -234,6 +234,7 @@ const mmCtx = hud.minimap.getContext('2d');
 
 function showOverlay(kind) {
   $('overlay').classList.remove('hidden');
+  document.body.classList.add('menu-aberto');
   $('screen-start').classList.toggle('hidden', kind !== 'start');
   $('screen-select').classList.toggle('hidden', kind !== 'select');
   $('screen-pause').classList.toggle('hidden', kind !== 'pause');
@@ -275,6 +276,7 @@ function initDeathcardTilt() {
 }
 function hideOverlay() {
   $('overlay').classList.add('hidden');
+  document.body.classList.remove('menu-aberto');
   const tui = document.getElementById('touch-ui');
   if (tui && touchMode) tui.style.display = '';
 }
