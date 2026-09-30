@@ -304,9 +304,20 @@ function applyQuality(q) {
   const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
   const small = Math.min(innerWidth, innerHeight) < 820;
   let auto = 'alta';
-  if (isTouch || small) auto = 'baixa';
-  const level = (q || localStorage.getItem('urbana-quality') || auto);
-  try { localStorage.setItem('urbana-quality', level); } catch {}
+  // Janela pequena media (pixelRatio 1.5): antes caiam para baixa (ratio 1) e a
+  // arma pixelava ao andar. Baixa fica so para toque.
+  if (isTouch) auto = 'baixa';
+  else if (small) auto = 'media';
+  let level = (q || localStorage.getItem('urbana-quality') || auto);
+  try {
+    // Migracao unica: versoes antigas salvavam "baixa" so por a janela ser pequena;
+    // sobe para "media" uma vez (quem quiser baixa de novo clica no botao).
+    if (!q && !isTouch && level === 'baixa' && !localStorage.getItem('urbana-q-v12')) {
+      level = 'media';
+      localStorage.setItem('urbana-q-v12', '1');
+    }
+    localStorage.setItem('urbana-quality', level);
+  } catch {}
   if (level === 'baixa') {
     renderer.setPixelRatio(1);
     renderer.shadowMap.enabled = false;
