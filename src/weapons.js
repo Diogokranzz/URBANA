@@ -36,7 +36,7 @@ function texPair(canvas) {
   const map = new THREE.CanvasTexture(canvas);
   map.colorSpace = THREE.SRGBColorSpace;
   map.wrapS = map.wrapT = THREE.RepeatWrapping;
-  map.anisotropy = 4;
+  map.anisotropy = 8;
   const bump = new THREE.CanvasTexture(canvas);
   bump.wrapS = bump.wrapT = THREE.RepeatWrapping;
   return { map, bump };
@@ -119,28 +119,28 @@ export class Weapons {
     const poly = texPair(grainCanvas('#22252a', 0.12, 8, 0.10, false));
     const olive = texPair(grainCanvas('#46533a', 0.12, 6, 0.14, true));
 
-    const woodC = document.createElement('canvas'); woodC.width = woodC.height = 256;
+    const woodC = document.createElement('canvas'); woodC.width = woodC.height = 512;
     {
       const g = woodC.getContext('2d');
-      g.fillStyle = '#7a4a26'; g.fillRect(0, 0, 256, 256);
-      for (let i = 0; i < 34; i++) {
+      g.fillStyle = '#7a4a26'; g.fillRect(0, 0, 512, 512);
+      for (let i = 0; i < 70; i++) {
         g.strokeStyle = `rgba(${40 + Math.random() * 30},${18 + Math.random() * 16},6,${0.25 + Math.random() * 0.4})`;
-        g.lineWidth = 1 + Math.random() * 2.6;
+        g.lineWidth = 1 + Math.random() * 3;
         g.beginPath();
-        let y = Math.random() * 256;
+        let y = Math.random() * 512;
         g.moveTo(0, y);
-        for (let x = 0; x <= 256; x += 16) { y += (Math.random() - 0.5) * 9; g.lineTo(x, y); }
+        for (let x = 0; x <= 512; x += 16) { y += (Math.random() - 0.5) * 9; g.lineTo(x, y); }
         g.stroke();
       }
-      for (let i = 0; i < 3; i++) {
-        const x = Math.random() * 256, y = Math.random() * 256;
-        const rad = g.createRadialGradient(x, y, 0, x, y, 7 + Math.random() * 6);
-        rad.addColorStop(0, 'rgba(30,12,4,0.85)'); rad.addColorStop(1, 'rgba(30,12,4,0)');
-        g.fillStyle = rad; g.beginPath(); g.arc(x, y, 12, 0, 7); g.fill();
-      }
       for (let i = 0; i < 6; i++) {
+        const x = Math.random() * 512, y = Math.random() * 512;
+        const rad = g.createRadialGradient(x, y, 0, x, y, 12 + Math.random() * 10);
+        rad.addColorStop(0, 'rgba(30,12,4,0.85)'); rad.addColorStop(1, 'rgba(30,12,4,0)');
+        g.fillStyle = rad; g.beginPath(); g.arc(x, y, 22, 0, 7); g.fill();
+      }
+      for (let i = 0; i < 12; i++) {
         g.fillStyle = 'rgba(255,220,170,0.06)';
-        g.fillRect(0, Math.random() * 256, 256, 2 + Math.random() * 4);
+        g.fillRect(0, Math.random() * 512, 512, 3 + Math.random() * 5);
       }
     }
     const woodPair = texPair(woodC);

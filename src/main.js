@@ -561,28 +561,47 @@ function exitVehicle() {
   audio.engineStop();
   audio.turboSet(false);
   if (vehicle.userData.flames) vehicle.userData.flames.visible = false;
-  const carBox = phys.colliders.find(b => b.carGroup === vehicle) || null;
+  // tryFree usa padding 0.55 (> raio do jogador 0.4 + margem) e chega TODOS os
+  // colliders, inclusive a caixa do proprio carro — antes o ponto de saida nascia
+  // dentro dela e a fisica (que reverte movimento sobreposto) travava o jogador.
   const tryFree = (x, z) => {
     for (const b of phys.colliders) {
-      if (b === carBox) continue;
       if (b.max.y <= 0.56) continue;
-      if (x + 0.42 > b.min.x && x - 0.42 < b.max.x && z + 0.42 > b.min.z && z - 0.42 < b.max.z) return false;
+      if (x + 0.55 > b.min.x && x - 0.55 < b.max.x && z + 0.55 > b.min.z && z - 0.55 < b.max.z) return false;
     }
     return true;
   };
   const fx = -Math.sin(vehicle.rotation.y), fz = -Math.cos(vehicle.rotation.y);
   const side = new THREE.Vector3(fz, 0, -fx);
   const spots = [
-    vehicle.position.clone().addScaledVector(side, 1.8),
-    vehicle.position.clone().addScaledVector(side, 2.6),
-    vehicle.position.clone().addScaledVector(side, -1.8),
-    vehicle.position.clone().addScaledVector(side, -2.6),
-    vehicle.position.clone().addScaledVector(new THREE.Vector3(fx, 0, fz), 3.2),
+    vehicle.position.clone().addScaledVector(side, 2.9),
+    vehicle.position.clone().addScaledVector(side, 3.7),
+    vehicle.position.clone().addScaledVector(side, -2.9),
+    vehicle.position.clone().addScaledVector(side, -3.7),
+    vehicle.position.clone().addScaledVector(new THREE.Vector3(fx, 0, fz), 3.6),
   ];
-  const out = spots.find(p => tryFree(p.x, p.z));
-  const drop = out || spots[4];
-  player.pos.set(drop.x, 0, drop.z);
-  player.vel.set(0, 0, 0);
+  let out = spots.find(p => tryFree(p.x, p.z));
+  if (!out) {
+    // Busca em espiral ao redor do carro: garante saida mesmo preso entre o carro e uma parede.
+    outer:
+    for (let ring = 3.0; ring <= 9.5; ring += 0.7) {
+      for (let a = 0; a < 16; a++) {
+        const ang = (a / 16) * Math.PI * 2;
+        const x = vehicle.position.x + Math.cos(ang) * ring;
+        const z = vehicle.position.z + Math.sin(ang) * ring;
+        if (tryFree(x, z)) { out = new THREE.Vector3(x, 0, z); break outer; }
+      }
+    }
+  }
+  if (!out) {
+    // Ultimo recurso: sobe no teto do carro — a fisica trata a caixa como chao (max.y 2.0)
+    // e nunca trava; o jogador pode andar e pular dali.
+    player.pos.set(vehicle.position.x, 2.05, vehicle.position.z);
+    player.vel.set(0, 0, 0);
+  } else {
+    player.pos.set(out.x, 0, out.z);
+    player.vel.set(0, 0, 0);
+  }
   vehicle = null;
   vehState.speed = 0; vehState.steer = 0;
   if (playerAvatar) {
