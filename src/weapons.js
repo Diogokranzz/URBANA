@@ -416,9 +416,10 @@ export class Weapons {
     this.smg = smg;
 
     const shotgun = new THREE.Group();
-    // Metais LISOS (cor solida, sem textura de riscos) — nada de linhas listradas.
+    // Metais e polimero LISOS (cor solida, sem textura de riscos/granulado).
     const steelSmooth = new THREE.MeshStandardMaterial({ color: 0x3a4048, roughness: 0.42, metalness: 0.8 });
     const gunSmooth = new THREE.MeshStandardMaterial({ color: 0x2b3036, roughness: 0.5, metalness: 0.75 });
+    const polySmooth = new THREE.MeshStandardMaterial({ color: 0x1d2024, roughness: 0.78, metalness: 0.12 });
     const p12Rec = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.07, 0.22), darkMetal);
     p12Rec.position.set(0, 0, -0.02);
     const p12Bar = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, 0.34, 12), steelSmooth);
@@ -427,28 +428,30 @@ export class Weapons {
     p12Muzzle.position.set(0, 0.012, -0.47);
     const p12Tube = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.28, 10), gunSmooth);
     p12Tube.rotation.x = Math.PI / 2; p12Tube.position.set(0, -0.026, -0.265);
-    const p12Pump = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.09, 12), polymer);
+    const p12Pump = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.09, 12), polySmooth);
     p12Pump.rotation.x = Math.PI / 2; p12Pump.position.set(0, -0.026, -0.245);
     const p12PumpRing = new THREE.Mesh(new THREE.TorusGeometry(0.023, 0.0035, 8, 16), gunSmooth);
     p12PumpRing.position.set(0, -0.026, -0.245);
     // Mira no estilo real de shotgun: anel no meio do cano e poste fino na ponta,
     // ambos com torres de 4mm (quase invisiveis) — nada bloqueia o centro da tela.
     const p12RingTower = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.03, 0.006), darkMetal);
-    p12RingTower.position.set(0, 0.045, -0.24);
+    p12RingTower.position.set(0, 0.042, -0.24);
     const p12Ring = new THREE.Mesh(new THREE.TorusGeometry(0.013, 0.0022, 8, 28), darkMetal);
     p12Ring.position.set(0, 0.075, -0.24);
     const p12FrontTower = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.044, 0.004), darkMetal);
-    p12FrontTower.position.set(0, 0.053, -0.42);
+    p12FrontTower.position.set(0, 0.049, -0.42);
     const p12Bead = new THREE.Mesh(
       new THREE.SphereGeometry(0.004, 8, 6),
       new THREE.MeshBasicMaterial({ color: 0xff8c1a })
     );
     p12Bead.position.set(0, 0.077, -0.42);
-    const p12Stock = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.09, 0.2), polymer);
+    const p12Stock = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.09, 0.2), polySmooth);
     p12Stock.position.set(0, -0.02, 0.2); p12Stock.rotation.x = 0.12;
-    const p12Neck = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.06, 0.1), polymer);
-    p12Neck.position.set(0, 0.005, 0.09);
-    const p12Grip = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.085, 0.05), polymer);
+    // Pescoço rebaixado: antes o topo encostava EXATAMENTE no topo do ferrolho
+    // (z-fighting = faixas listradas que mudam ao andar). Agora fica 4mm abaixo.
+    const p12Neck = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.056, 0.1), polySmooth);
+    p12Neck.position.set(0, 0.003, 0.09);
+    const p12Grip = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.085, 0.05), polySmooth);
     p12Grip.position.set(0, -0.062, 0.075); p12Grip.rotation.x = -0.3;
     const p12TriggerG = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.005, 6, 12), gunSmooth);
     p12TriggerG.rotation.y = Math.PI / 2; p12TriggerG.position.set(0, -0.05, 0.02);
