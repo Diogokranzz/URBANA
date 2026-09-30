@@ -5,6 +5,22 @@ const path = require('path');
 const root = __dirname;
 const PORT = process.env.PORT || 8137;
 
+// Recebe a gravacao feita pelo proprio jogo (canvas.captureStream) e salva em docs/video.
+function handleRecord(req, res) {
+  const chunks = [];
+  req.on('data', c => chunks.push(c));
+  req.on('end', () => {
+    const dir = path.join(__dirname, 'docs', 'video');
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, 'gameplay-capturado.webm');
+    fs.writeFileSync(file, Buffer.concat(chunks));
+    console.log('[record] salvo', file, chunks.reduce((a, c) => a + c.length, 0), 'bytes');
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, bytes: chunks.reduce((a, c) => a + c.length, 0) }));
+  });
+  req.on('error', () => { try { res.destroy(); } catch {} });
+}
+
 const types = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -54,8 +70,13 @@ const server = http.createServer((req, res) => {
   hits.set(ip, n);
   if (n > 240) { res.writeHead(429); return res.end('Too Many Requests'); }
 
+  // Endpoint de gravacao (POST /record) usado pelo auto-gravador do canvas.
+  if (req.method === 'POST' && req.url.split('?')[0] === '/record') {
+    return handleRecord(req, res);
+  }
+
   if (req.method !== 'GET' && req.method !== 'HEAD') {
-    res.writeHead(405, { Allow: 'GET, HEAD' });
+    res.writeHead(405, { Allow: 'GET, HEAD, POST /record' });
     return res.end();
   }
 

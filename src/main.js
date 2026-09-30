@@ -970,6 +970,143 @@ function frame(nowT) {
 }
 
 let rotateTipVisible = false;
+// Driver de teste/video: roda update+render manualmente (uso: __videoDriver.start(60))
+// quando o rAF esta suspenso (aba em segundo plano durante gravacao).
+window.__videoDriver = {
+  timer: null,
+  running: false,
+  frames: 0,
+  start(fps = 60) {
+    this.stop();
+    this.frames = 0;
+    const step = 1000 / fps;
+    let t = performance.now();
+    this.timer = setInterval(() => {
+      const now = performance.now();
+      const dt = Math.min(0.05, (now - t) / 1000);
+      t = now;
+      if (!state.running || state.paused || state.over) return;
+      state.time += dt;
+      update(dt);
+      render();
+      this.frames++;
+      // Auto-gravacao: compoe jogo + HUD e captura o frame (aba em fundo ok).
+      if (window.__videoRecorder && window.__videoRecorder.recording) {
+        try { window.__videoRecorder.compose(); window.__videoRecorder.track.requestFrame(); } catch {}
+      }
+    }, step);
+    this.running = true;
+  },
+  stop() { if (this.timer) { clearInterval(this.timer); this.timer = null; } this.running = false; },
+};
+// Auto-gravador do canvas: MediaRecorder + captureStream(0) com requestFrame manual.
+// Grava a 60fps reais independentemente da aba estar visivel ou nao.
+window.__videoRecorder = {
+  recorder: null,
+  track: null,
+  chunks: [],
+  recording: false,
+  comp: null,
+  cctx: null,
+  start(bitrate = 9000000) {
+    this.stop();
+    const glCanvas = document.querySelector('#game canvas');
+    // Compositor: canvas 2D que junta o frame 3D + HUD redesenhado (o captureStream
+    // do WebGL so pega o cenario, sem os overlays HTML).
+    const comp = document.createElement('canvas');
+    comp.width = glCanvas.width; comp.height = glCanvas.height;
+    this.comp = comp;
+    this.cctx = comp.getContext('2d');
+    const stream = comp.captureStream(0);
+    this.track = stream.getVideoTracks()[0];
+    this.chunks = [];
+    const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'].find(m => MediaRecorder.isTypeSupported(m));
+    this.recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: bitrate });
+    this.recorder.ondataavailable = e => { if (e.data.size) this.chunks.push(e.data); };
+    this.recorder.start(1000);
+    this.recording = true;
+  },
+  compose() {
+    if (!this.cctx) return;
+    const c = this.cctx, W = this.comp.width, H = this.comp.height;
+    const glCanvas = document.querySelector('#game canvas');
+    c.drawImage(glCanvas, 0, 0, W, H);
+    const S = W / 1280; // escala relativa ao design 1280x720
+    const $ = id => document.getElementById(id);
+    const txt = (t, x, y, font, color, align = 'left', ls = 0) => {
+      c.font = font; c.fillStyle = color; c.textAlign = align; c.textBaseline = 'alphabetic';
+      if (ls) { // letter-spacing manual
+        let x2 = align === 'center' ? x - c.measureText(t).width / 2 : align === 'right' ? x - c.measureText(t).width : x;
+        c.textAlign = 'left';
+        for (const ch of t) { c.fillText(ch, x2, y); x2 += c.measureText(ch).width + ls; }
+      } else c.fillText(t, x, y);
+    };
+    const rr = (x, y, w, h, r) => { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); };
+    // Chips topo centro
+    const chips = [
+      ['ONDA', $('wave') ? $('wave').textContent : '1', '#e8c35a'],
+      ['HOSTIS', $('enemies') ? $('enemies').textContent : '0', '#ff5545'],
+      ['PONTOS', $('score') ? $('score').textContent : '0', '#e8c35a'],
+      ['ONLINE', $('online') ? $('online').textContent : '1', '#6db3d8'],
+    ];
+    const cw = 118 * S, chh = 64 * S, gap = 14 * S;
+    let cx = W / 2 - (chips.length * cw + (chips.length - 1) * gap) / 2;
+    for (const [label, val, col] of chips) {
+      c.fillStyle = 'rgba(10,14,17,0.72)'; rr(cx, 16 * S, cw, chh, 8 * S); c.fill();
+      c.strokeStyle = 'rgba(255,255,255,0.14)'; c.lineWidth = 1 * S; c.stroke();
+      txt(label, cx + cw / 2, 34 * S, `600 ${11 * S}px Segoe UI`, '#8d9aa4', 'center', 2.5 * S);
+      txt(val, cx + cw / 2, 66 * S, `800 ${26 * S}px Segoe UI`, col, 'center');
+      cx += cw + gap;
+    }
+    // Municicao / arma (baixo direito)
+    const ammo = $('ammo') ? $('ammo').textContent : '';
+    const weapon = $('weapon') ? $('weapon').textContent : '';
+    c.fillStyle = 'rgba(10,14,17,0.55)'; rr(W - 240 * S, H - 96 * S, 224 * S, 78 * S, 8 * S); c.fill();
+    txt(ammo, W - 28 * S, H - 52 * S, `800 ${34 * S}px Segoe UI`, '#eef2f4', 'right');
+    txt(weapon, W - 28 * S, H - 30 * S, `600 ${12 * S}px Segoe UI`, '#9fb2bd', 'right', 2 * S);
+    // Vida (baixo esquerdo)
+    const hp = $('health') ? $('health').textContent : '100';
+    c.fillStyle = 'rgba(10,14,17,0.55)'; rr(16 * S, H - 88 * S, 236 * S, 70 * S, 8 * S); c.fill();
+    txt(hp, 28 * S, H - 36 * S, `800 ${34 * S}px Segoe UI`, '#eef2f4', 'left');
+    const barW = 150 * S;
+    const hpBar = $('health-bar'), shBar = $('shield-bar');
+    c.fillStyle = 'rgba(255,255,255,0.12)'; rr(96 * S, H - 60 * S, barW, 9 * S, 4 * S); c.fill();
+    if (hpBar) { const fw = Math.max(0, Math.min(1, hpBar.offsetWidth / (hpBar.parentElement.offsetWidth || 1))); c.fillStyle = '#7dd069'; rr(96 * S, H - 60 * S, barW * fw, 9 * S, 4 * S); c.fill(); }
+    if (shBar && shBar.offsetWidth > 0) { const fw = Math.max(0, Math.min(1, shBar.offsetWidth / (shBar.parentElement.offsetWidth || 1))); c.fillStyle = '#5aa9d6'; rr(96 * S, H - 46 * S, barW * fw, 7 * S, 3 * S); c.fill(); }
+    // Minimapa (topo direito)
+    const mm = $('minimap');
+    if (mm) { c.fillStyle = 'rgba(8,12,15,0.8)'; rr(W - 196 * S, 14 * S, 182 * S, 182 * S, 8 * S); c.fill(); c.drawImage(mm, W - 188 * S, 22 * S, 166 * S, 166 * S); c.strokeStyle = 'rgba(255,255,255,0.18)'; c.lineWidth = 1.5 * S; rr(W - 196 * S, 14 * S, 182 * S, 182 * S, 8 * S); c.stroke(); }
+    // Crosshair
+    const mx = W / 2, my = H / 2, gapc = 9 * S, len = 9 * S;
+    c.strokeStyle = 'rgba(240,244,246,0.9)'; c.lineWidth = 1.6 * S;
+    c.beginPath();
+    c.moveTo(mx - gapc - len, my); c.lineTo(mx - gapc, my);
+    c.moveTo(mx + gapc, my); c.lineTo(mx + gapc + len, my);
+    c.moveTo(mx, my - gapc - len); c.lineTo(mx, my - gapc);
+    c.moveTo(mx, my + gapc); c.lineTo(mx, my + gapc + len);
+    c.stroke();
+    c.fillStyle = 'rgba(240,244,246,0.95)'; c.beginPath(); c.arc(mx, my, 1.6 * S, 0, 7); c.fill();
+  },
+  async stop() {
+    if (!this.recorder) return null;
+    const rec = this.recorder;
+    const done = new Promise(res => { rec.onstop = res; });
+    rec.stop();
+    await done;
+    this.track = null;
+    this.recorder = null;
+    this.recording = false;
+    const blob = new Blob(this.chunks, { type: 'video/webm' });
+    this.chunks = [];
+    window.__videoBlob = blob;
+    // Envia para o servidor local
+    try {
+      const r = await fetch('/record', { method: 'POST', body: blob, headers: { 'Content-Type': 'video/webm' } });
+      window.__videoEnviado = r.ok ? true : 'http ' + r.status;
+    } catch (e) { window.__videoEnviado = 'erro: ' + e.message; }
+    return blob.size;
+  },
+};
 function syncPauseFromTip() {
   const tip = document.getElementById('touch-rotate-tip');
   const showing = !!(tip && tip.classList.contains('on'));
