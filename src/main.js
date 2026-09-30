@@ -323,12 +323,14 @@ function applyQuality(q) {
     renderer.shadowMap.enabled = false;
     scene.fog = null;
   } else if (level === 'media') {
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+    // Supersampling: em monitores 1080p (dpr 1) renderiza a 1.25x para as bordas
+    // finas (miras, canos) nao serrilharem.
+    renderer.setPixelRatio(Math.min(Math.max(devicePixelRatio, 1.25), 1.5));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
     if (world.baseFog) { scene.fog = world.baseFog; }
   } else {
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(Math.max(devicePixelRatio, 1.5), 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     if (world.baseFog) { scene.fog = world.baseFog; }
