@@ -433,21 +433,19 @@ export class Weapons {
     p12Pump.rotation.x = Math.PI / 2; p12Pump.position.set(0, -0.026, -0.245);
     const p12PumpRing = new THREE.Mesh(new THREE.TorusGeometry(0.023, 0.0035, 8, 16), gunmetal2);
     p12PumpRing.position.set(0, -0.026, -0.245);
-    const p12FrontTower = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.042, 0.006), darkMetal);
-    p12FrontTower.position.set(0, 0.041, -0.44);
-    const p12Pin = new THREE.Mesh(new THREE.CylinderGeometry(0.0018, 0.0018, 0.014, 6), darkMetal);
-    p12Pin.position.set(0, 0.069, -0.44);
+    // Mira no estilo real de shotgun: anel no meio do cano e poste fino na ponta,
+    // ambos com torres de 4mm (quase invisiveis) — nada bloqueia o centro da tela.
+    const p12RingTower = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.03, 0.006), darkMetal);
+    p12RingTower.position.set(0, 0.045, -0.24);
+    const p12Ring = new THREE.Mesh(new THREE.TorusGeometry(0.013, 0.0022, 8, 28), darkMetal);
+    p12Ring.position.set(0, 0.075, -0.24);
+    const p12FrontTower = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.044, 0.004), darkMetal);
+    p12FrontTower.position.set(0, 0.053, -0.42);
     const p12Bead = new THREE.Mesh(
       new THREE.SphereGeometry(0.004, 8, 6),
       new THREE.MeshBasicMaterial({ color: 0xff8c1a })
     );
-    p12Bead.position.set(0, 0.077, -0.44);
-    // Torre do anel baixa (topo em 0.062, abaixo da linha de mira em 0.075):
-    // ao mirar, o centro fica totalmente limpo — ve-se atraves do anel.
-    const p12RingTower = new THREE.Mesh(new THREE.BoxGeometry(0.009, 0.03, 0.012), darkMetal);
-    p12RingTower.position.set(0, 0.047, 0.03);
-    const p12Ring = new THREE.Mesh(new THREE.TorusGeometry(0.013, 0.0022, 8, 28), darkMetal);
-    p12Ring.position.set(0, 0.075, 0.03);
+    p12Bead.position.set(0, 0.077, -0.42);
     const p12Stock = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.09, 0.2), polymer);
     p12Stock.position.set(0, -0.02, 0.2); p12Stock.rotation.x = 0.12;
     const p12Neck = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.06, 0.1), polymer);
@@ -457,7 +455,7 @@ export class Weapons {
     const p12TriggerG = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.005, 6, 12), gunmetal2);
     p12TriggerG.rotation.y = Math.PI / 2; p12TriggerG.position.set(0, -0.05, 0.02);
     shotgun.add(p12Rec, p12Bar, p12Muzzle, p12Rib, p12Tube, p12Pump, p12PumpRing,
-      p12FrontTower, p12Pin, p12Bead, p12RingTower, p12Ring, p12Stock, p12Neck, p12Grip, p12TriggerG);
+      p12RingTower, p12Ring, p12FrontTower, p12Bead, p12Stock, p12Neck, p12Grip, p12TriggerG);
     const sgL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.09), glove);
     sgL.position.set(-0.005, -0.055, -0.22);
     const sgR = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.085, 0.09), glove);
