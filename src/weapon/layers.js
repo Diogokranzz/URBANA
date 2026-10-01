@@ -50,6 +50,8 @@ export class SwayComponent {
     this.profile = { bob: 1, swayScale: 1, inertia: 1, breath: 1, runInstability: 1.3 };
     this.roll = 0;
     this.pitchLag = 0;
+    this.velPrev = new THREE.Vector3();
+    this.semVel = true;
   }
 
   setProfile(p) {
@@ -62,13 +64,18 @@ export class SwayComponent {
     this.inertia.set(0, 0);
     this.roll = 0;
     this.pitchLag = 0;
+    this.semVel = true;
   }
 
   update(dt, ctx) {
     const s = ctx.config;
     const p = this.profile;
     const ads = ctx.adsK;
-    const swayScale = (1 - ads * 0.78) * p.swayScale * s.weaponSway;
+    const escalaSway = ctx.adsSwayScale !== undefined ? ctx.adsSwayScale : 1 - ads * 0.78;
+    const escalaBob = ctx.adsBobScale !== undefined ? ctx.adsBobScale : 1 - ads * 0.82;
+    const escalaInercia = ctx.adsInertiaScale !== undefined ? ctx.adsInertiaScale : 1 - ads * 0.6;
+    const escalaRespiracao = ctx.adsBreathScale !== undefined ? ctx.adsBreathScale : 1;
+    const swayScale = escalaSway * p.swayScale * s.weaponSway;
 
     const alvoX = clampN(ctx.lookX * 0.16, -1, 1);
     const alvoY = clampN(ctx.lookY * 0.16, -1, 1);
@@ -80,47 +87,103 @@ export class SwayComponent {
     const cos = Math.cos(ctx.camYaw), sin = Math.sin(ctx.camYaw);
     const direita = vel.x * cos - vel.z * sin;
     const frente = -vel.x * sin - vel.z * cos;
-    const inercia = (0.05 + 0.05 * p.inertia) * (1 - ads * 0.6) * s.weaponSway;
-    this.inertia.x = damp(this.inertia.x, clampN(-direita * inercia, -0.14, 0.14), VIEWMODEL.curves.inertiaDamp, dt);
-    this.inertia.y = damp(this.inertia.y, clampN(frente * inercia * 0.6, -0.1, 0.1), VIEWMODEL.curves.inertiaDamp, dt);
+
+    let acelDir = 0, acelFrente = 0;
+    if (dt > 1e-5 && !this.semVel) {
+      const dvx = (vel.x - this.velPrev.x) / dt;
+      const dvz = (vel.z - this.velPrev.z) / dt;
+      acelDir = dvx * cos - dvz * sin;
+      acelFrente = -dvx * sin - dvz * cos;
+    }
+    this.velPrev.copy(vel);
+    this.semVel = false;
+
+    const ganhoInercia = (0.008 + 0.008 * p.inertia) * escalaInercia * s.weaponSway;
+    this.inertia.x = damp(this.inertia.x, clampN(-acelDir * ganhoInercia, -VIEWMODEL.limits.inertia, VIEWMODEL.limits.inertia), VIEWMODEL.curves.inertiaDamp, dt);
+    this.inertia.y = damp(this.inertia.y, clampN(acelFrente * ganhoInercia * 0.7, -VIEWMODEL.limits.inertia, VIEWMODEL.limits.inertia), VIEWMODEL.curves.inertiaDamp, dt);
 
     const speed = Math.hypot(vel.x, vel.z);
     const andando = speed > 0.35 && ctx.grounded;
     const corrida = ctx.running && andando;
     const passo = ctx.dtScale || 1;
-    if (andando) this.bobT += dt * VIEWMODEL.curves.bob * passo * (corrida ? 1.55 : 1) * (0.75 + speed / 6);
+    if (andando) this.bobT += dt * VIEWMODEL.curves.bob * passo * (corrida ? 1.5 : 1) * (0.75 + speed / 6);
     else this.bobT += dt * 1.1;
 
     this.breathT += dt * VIEWMODEL.curves.breath * (1 + (1 - ads) * 0.4);
 
-    const ampBob = ampp(p.bob, s.bobScale, ads, andando, corrida);
+    const ampBob = ampp(p.bob, s.bobScale, escalaBob * (ctx.locomotionBobScale !== undefined ? ctx.locomotionBobScale : 1), andando, corrida);
     const bobX = Math.sin(this.bobT) * ampBob.x;
-    const bobY = Math.abs(Math.cos(this.bobT)) * ampBob.y;
+    const bobY = Math.sin(this.bobT * 2) * ampBob.y * 0.5;
     const folga = corrida ? p.runInstability : 1;
 
-    this.roll = damp(this.roll, clampN(-direita * 0.02 * folga, -VIEWMODEL.limits.roll, VIEWMODEL.limits.roll), 6, dt);
-    this.pitchLag = damp(this.pitchLag, clampN(-frente * 0.012 * folga, -0.05, 0.05), 6, dt);
+    const ampSway = VIEWMODEL.limits.sway;
+    const localScale = ctx.locomotionSwayScale !== undefined ? ctx.locomotionSwayScale : 1;
+    const respira = VIEWMODEL.limits.breath * 0.6 * p.breath * s.weaponSway * escalaRespiracao;
+    const deslocamento = ctx.velocity ? Math.hypot(vel.x, vel.z) : 0;
 
-    const ampSway = VIEWMODEL.limits.sway * (1 - ads * 0.72);
-    const respira = VIEWMODEL.limits.breath * (0.6 + ads * 0.9) * p.breath * s.weaponSway;
+    this.roll = damp(this.roll, clampN(-direita * 0.018 * folga, -VIEWMODEL.limits.roll, VIEWMODEL.limits.roll), 6, dt);
+    this.pitchLag = damp(this.pitchLag, clampN(-frente * 0.01 * folga, -0.05, 0.05), 6, dt);
 
     return {
-      x: this.sway.x * ampSway + this.inertia.x + bobX,
-      y: this.sway.y * ampSway + this.inertia.y + bobY,
-      z: -Math.abs(this.sway.x) * 0.012,
-      rx: this.sway.y * ampSway * 0.7 + this.pitchLag,
-      ry: this.sway.x * ampSway * 0.9,
-      rz: this.roll + Math.sin(this.bobT * 0.5) * 0.006 * (1 - ads),
+      x: this.sway.x * ampSway * swayScale * localScale + this.inertia.x + bobX,
+      y: this.sway.y * ampSway * swayScale * localScale + this.inertia.y + bobY,
+      z: -Math.abs(this.sway.x) * 0.012 * escalaSway,
+      rx: (this.sway.y * ampSway * 0.7 * swayScale * localScale + this.pitchLag),
+      ry: this.sway.x * ampSway * 0.9 * swayScale * localScale,
+      rz: this.roll + Math.sin(this.bobT * 0.5) * 0.006 * escalaBob,
       breath: Math.sin(this.breathT) * respira,
       breathY: Math.cos(this.breathT * 0.73) * respira * 0.7,
       breathRoll: Math.sin(this.breathT * 0.61) * respira * 0.5,
+      andando,
+      corrida,
+      velocidade: deslocamento,
     };
   }
 }
 
-function ampp(bob, escala, ads, andando, corrida) {
-  const base = (andando ? (corrida ? 1.5 : 1) : 0.42) * bob * escala * (1 - ads * 0.82);
+function ampp(bob, escala, adsScale, andando, corrida) {
+  const base = (andando ? (corrida ? 1.5 : 1) : 0.42) * bob * escala * adsScale;
   return { x: base * 0.011, y: base * 0.008 };
+}
+
+export class SprintPoseComponent {
+  constructor() {
+    this.k = 0;
+    this.pose = {
+      x: 0.012, y: -0.05, z: 0.024, rx: 0.18, ry: -0.24, rz: -0.14,
+      swiftness: 1, swayMultiplier: 0.75, bobMultiplier: 0.5,
+      transitionIn: 7, transitionOut: 6, maxTranslation: 0.12, maxRotation: 0.45,
+    };
+  }
+
+  setPose(p) {
+    if (p) this.pose = { ...this.pose, ...p };
+  }
+
+  reset() {
+    this.k = 0;
+  }
+
+  update(dt, ctx) {
+    const p = this.pose;
+    const desejado = ctx.sprinting && ctx.grounded !== false ? 1 : 0;
+    const resposta = desejado ? p.transitionIn : p.transitionOut;
+    const alvo = desejado * (1 - ctx.adsK);
+    this.k = damp(this.k, alvo, resposta, dt);
+    const maxT = p.maxTranslation;
+    const maxR = p.maxRotation;
+    return {
+      x: clampN((p.x || 0) * this.k, -maxT, maxT),
+      y: clampN((p.y || 0) * this.k, -maxT, maxT),
+      z: clampN((p.z || 0) * this.k, -maxT, maxT),
+      rx: clampN((p.rx || 0) * this.k, -maxR, maxR),
+      ry: clampN((p.ry || 0) * this.k, -maxR, maxR),
+      rz: clampN((p.rz || 0) * this.k, -maxR, maxR),
+      k: this.k,
+      swayMultiplier: 1 - (1 - p.swayMultiplier) * this.k,
+      bobMultiplier: 1 - (1 - p.bobMultiplier) * this.k,
+    };
+  }
 }
 
 export class RecoilComponent {

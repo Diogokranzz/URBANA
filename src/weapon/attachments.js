@@ -1,14 +1,14 @@
 import * as THREE from '../../vendor/three.module.js';
 import { OPTIC_DEFAULTS, LASER_DEFAULTS } from '../config/weapon-data.js';
 import { Settings } from '../config/settings.js';
+import { lonaGrao } from '../lona.js';
 
 function clampN(v, a, b) {
   return v < a ? a : v > b ? b : v;
 }
 
 function reticleTexture(color, weak) {
-  const c = document.createElement('canvas');
-  c.width = c.height = 128;
+  const c = lonaGrao(128);
   const g = c.getContext('2d');
   g.clearRect(0, 0, 128, 128);
   const hex = '#' + new THREE.Color(color).getHexString();
@@ -34,8 +34,7 @@ function reticleTexture(color, weak) {
 }
 
 function glassSmudgeTexture() {
-  const c = document.createElement('canvas');
-  c.width = c.height = 128;
+  const c = lonaGrao(128);
   const g = c.getContext('2d');
   g.fillStyle = '#000000';
   g.fillRect(0, 0, 128, 128);
@@ -165,20 +164,18 @@ export class HoloSight {
     this.reticle.visible = this.occlusion > 0.05;
 
     const par = this.cfg.parallax || 0;
-    const e = ctx.eyeToLens;
     const a = ctx.axisDir;
-    if (par > 0 && e && a) {
-      const limite = this.radius * 0.32;
-      const tx = clampN(-(e.x - a.x) * par * 40, -limite, limite);
-      const ty = clampN(-(e.y - a.y) * par * 40, -limite, limite);
-      this.parallax.set(tx, ty);
-      const k = Math.min(1, dt * (6 + adsK * 12));
-      this.reticle.position.x += (tx - this.reticle.position.x) * k;
-      this.reticle.position.y += (ty - this.reticle.position.y) * k;
-    } else {
-      this.reticle.position.x += (0 - this.reticle.position.x) * Math.min(1, dt * 8);
-      this.reticle.position.y += (0 - this.reticle.position.y) * Math.min(1, dt * 8);
+    const cam = ctx.cameraAxis;
+    const limite = this.radius * 0.3;
+    let tx = 0, ty = 0;
+    if (par > 0 && a && cam) {
+      tx = clampN((a.x - cam.x) * par * 26, -limite, limite);
+      ty = clampN((a.y - cam.y) * par * 26, -limite, limite);
     }
+    this.parallax.set(tx, ty);
+    const k = Math.min(1, dt * (8 + adsK * 14));
+    this.reticle.position.x += (tx - this.reticle.position.x) * k;
+    this.reticle.position.y += (ty - this.reticle.position.y) * k;
 
     if (this.smudgeMat) {
       const cfg = Settings.preset();

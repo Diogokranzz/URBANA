@@ -87,6 +87,77 @@ export const RECOIL_PROFILE = {
   },
 };
 
+export const ADS_PROFILE = {
+  rifle: {
+    swayMultiplier: 0.16, bobMultiplier: 0.1, inertiaMultiplier: 0.16, breathingMultiplier: 0.1,
+    recoilMultiplier: 0.5, maxTranslation: 0.0032, maxRotation: 0.018, alignmentTolerance: 0.004,
+  },
+  pistol: {
+    swayMultiplier: 0.14, bobMultiplier: 0.09, inertiaMultiplier: 0.18, breathingMultiplier: 0.11,
+    recoilMultiplier: 0.55, maxTranslation: 0.003, maxRotation: 0.02, alignmentTolerance: 0.004,
+  },
+  sniper: {
+    swayMultiplier: 0.1, bobMultiplier: 0.06, inertiaMultiplier: 0.12, breathingMultiplier: 0.08,
+    recoilMultiplier: 0.55, maxTranslation: 0.0022, maxRotation: 0.012, alignmentTolerance: 0.003,
+  },
+  smg: {
+    swayMultiplier: 0.18, bobMultiplier: 0.12, inertiaMultiplier: 0.14, breathingMultiplier: 0.12,
+    recoilMultiplier: 0.45, maxTranslation: 0.0036, maxRotation: 0.022, alignmentTolerance: 0.0045,
+  },
+  shotgun: {
+    swayMultiplier: 0.2, bobMultiplier: 0.14, inertiaMultiplier: 0.2, breathingMultiplier: 0.13,
+    recoilMultiplier: 0.6, maxTranslation: 0.004, maxRotation: 0.024, alignmentTolerance: 0.005,
+  },
+  throwable: {},
+};
+
+export const SPRINT_PROFILE = {
+  rifle: {
+    x: 0.014, y: -0.052, z: 0.028, rx: 0.24, ry: -0.3, rz: -0.16,
+    transitionIn: 7.5, transitionOut: 6.5, swayMultiplier: 0.7, bobMultiplier: 0.5,
+    maxTranslation: 0.12, maxRotation: 0.45,
+  },
+  pistol: {
+    x: 0.016, y: -0.045, z: 0.02, rx: 0.3, ry: -0.22, rz: -0.2,
+    transitionIn: 10, transitionOut: 8.5, swayMultiplier: 0.75, bobMultiplier: 0.55,
+    maxTranslation: 0.1, maxRotation: 0.5,
+  },
+  smg: {
+    x: 0.013, y: -0.048, z: 0.024, rx: 0.22, ry: -0.34, rz: -0.14,
+    transitionIn: 8.5, transitionOut: 7, swayMultiplier: 0.7, bobMultiplier: 0.5,
+    maxTranslation: 0.11, maxRotation: 0.42,
+  },
+  sniper: {
+    x: 0.016, y: -0.062, z: 0.034, rx: 0.2, ry: -0.36, rz: -0.18,
+    transitionIn: 5.5, transitionOut: 4.5, swayMultiplier: 0.65, bobMultiplier: 0.4,
+    maxTranslation: 0.14, maxRotation: 0.5,
+  },
+  shotgun: {
+    x: 0.015, y: -0.058, z: 0.03, rx: 0.26, ry: -0.32, rz: -0.17,
+    transitionIn: 5, transitionOut: 4.2, swayMultiplier: 0.6, bobMultiplier: 0.4,
+    maxTranslation: 0.13, maxRotation: 0.48,
+  },
+  throwable: {},
+};
+
+export const WEAPON_SENSE_PRESETS = {
+  tatico: {
+    id: 'tatico',
+    label: 'TATICO',
+    sway: 0.78, adsIn: 1.08, adsOut: 1.05, recoil: 0.92, camKick: 0.85, flash: 0.85, sprint: 0.85, transition: 1.1,
+  },
+  cinematografico: {
+    id: 'cinematografico',
+    label: 'CINEMATOGRAFICO',
+    sway: 1.18, adsIn: 1.15, adsOut: 1.1, recoil: 1.12, camKick: 1.1, flash: 1.25, sprint: 1.12, transition: 1.25,
+  },
+  competitivo: {
+    id: 'competitivo',
+    label: 'COMPETITIVO',
+    sway: 0.45, adsIn: 0.82, adsOut: 0.8, recoil: 0.75, camKick: 0.4, flash: 0.7, sprint: 0.6, transition: 0.85,
+  },
+};
+
 export const WEAPONS = [
   {
     id: 'ak',
@@ -282,7 +353,7 @@ export const WEAPONS = [
     kickYaw: 0.014,
     speed: 300,
     range: 60,
-    pellets: 8,
+    pelletCount: 8,
     casing: false,
     sfx: 'shotgun',
     weight: 1.35,
@@ -327,6 +398,14 @@ export const VIEWMODEL = {
     sniper: { x: 0, y: -0.105, z: -0.3 },
     smg: { x: 0, y: -0.092, z: -0.24 },
     shotgun: { x: 0, y: -0.075, z: -0.26 },
+  },
+  baseRot: {
+    rifle: { x: 0, y: 0, z: 0 },
+    pistol: { x: 0, y: 0, z: 0 },
+    sniper: { x: 0, y: 0, z: 0 },
+    smg: { x: 0, y: 0, z: 0 },
+    shotgun: { x: 0, y: 0, z: 0 },
+    grenade: { x: 0, y: 0, z: 0 },
   },
   adsAlign: { rifle: 0.105, smg: 0.092, pistol: 0.078, sniper: 0.105, shotgun: 0.077 },
   hipFov: 62,

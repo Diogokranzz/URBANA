@@ -1,9 +1,12 @@
 import * as THREE from '../vendor/three.module.js';
-import { WEAPONS, WEAPON_BY_ID, RECOIL_PROFILE, VIEWMODEL, EASING, ease, OPTIC_DEFAULTS, LASER_DEFAULTS } from '../src/config/weapon-data.js';
+import { WEAPONS, WEAPON_BY_ID, RECOIL_PROFILE, VIEWMODEL, EASING, ease, OPTIC_DEFAULTS, LASER_DEFAULTS, ADS_PROFILE, SPRINT_PROFILE, WEAPON_SENSE_PRESETS } from '../src/config/weapon-data.js';
 import { SURFACES, surfaceOf, DECAL_LIMITS } from '../src/config/surfaces.js';
-import { GRAPHICS_PRESETS, DEFAULTS, Settings } from '../src/config/settings.js';
-import { AimDownSightsComponent, SwayComponent, RecoilComponent, WeaponCollisionComponent, clampN, damp } from '../src/weapon/layers.js';
+import { GRAPHICS_PRESETS, VISUAL_PRESETS, visualDe, LIMITES_SEGUROS, valorSeguro, DEFAULTS, Settings } from '../src/config/settings.js';
+import { AimDownSightsComponent, SwayComponent, RecoilComponent, WeaponCollisionComponent, SprintPoseComponent, clampN, damp } from '../src/weapon/layers.js';
 import { WeaponAnimationController } from '../src/weapon/anim-controller.js';
+import { contagemDeProjeteis, projeteisComTracer, permiteDisparo } from '../src/weapon/disparo.js';
+import { initWeaponDebug } from '../src/weapon/debug.js';
+import { Weapons } from '../src/weapons.js';
 
 let passou = 0;
 const falhas = [];
@@ -267,6 +270,327 @@ ok('FOV de ADS fica abaixo do quadril', (() => {
   c5.requestADS(true);
   for (let i = 0; i < 60; i++) c5.update(1 / 60, ctxAnim);
   return c5.update(1 / 60, ctxAnim).fov < quadril;
+})());
+
+function armaNua() {
+  const som = new Proxy({}, { get: () => () => 0 });
+  const efeitos = new Proxy({}, { get: () => () => 0 });
+  return new Weapons(new THREE.PerspectiveCamera(72, 16 / 9, 0.08, 500), efeitos, som, null, null);
+}
+
+const OPTS = {
+  moving: false, running: false, grounded: true, aimHeld: false,
+  camPos: new THREE.Vector3(0, 1.6, 0), camDir: new THREE.Vector3(0, 0, -1), camRight: new THREE.Vector3(1, 0, 0),
+  velocity: new THREE.Vector3(0, 0, 0), camYaw: 0, lookX: 0, lookY: 0, moveK: 0,
+};
+
+for (const w of ARMAS_DE_FOGO) {
+  const n = contagemDeProjeteis(w);
+  ok('arma ' + w.id + ' tem contagem de projetil definida', w.class === 'shotgun' ? n === w.pelletCount && n > 1 : n === 1, String(n));
+  ok('arma ' + w.id + ' nao gera projetil extra por tracer', projeteisComTracer(n) <= n);
+}
+ok('escopeta usa a quantidade de pellets configurada', contagemDeProjeteis(WEAPON_BY_ID.pump) === WEAPON_BY_ID.pump.pelletCount);
+ok('contagem de projetil resiste a dados invalidos', contagemDeProjeteis(null) === 1 && contagemDeProjeteis({ class: 'shotgun', pelletCount: 0 }) === 1 && contagemDeProjeteis({ class: 'shotgun', pelletCount: 999 }) === 24 && contagemDeProjeteis({ class: 'shotgun' }) === 1);
+ok('optica e FOV nao mudam a contagem de projetil', (() => {
+  const ak = WEAPON_BY_ID.ak;
+  const alterado = { ...ak, adsFov: 8, scope: true, optic: { ...ak.optic, kind: 'scope' } };
+  return contagemDeProjeteis(ak) === 1 && contagemDeProjeteis(alterado) === 1;
+})());
+
+ok('cadencia automatica respeita o intervalo do rpm', (() => {
+  const d = WEAPON_BY_ID.mp5;
+  const intervalo = 60 / d.rpm;
+  const ultimo = 10;
+  return permiteDisparo(true, ultimo + intervalo, ultimo, d.rpm) === true &&
+    permiteDisparo(true, ultimo + intervalo * 0.4, ultimo, d.rpm) === false &&
+    permiteDisparo(true, ultimo + intervalo * 4, ultimo, d.rpm) === true &&
+    permiteDisparo(true, ultimo, ultimo, d.rpm) === false &&
+    permiteDisparo(true, ultimo + intervalo + 60, ultimo, d.rpm) === true;
+})());
+ok('cadencia manual exige novo acionamento', (() => {
+  const d = WEAPON_BY_ID.deagle;
+  const intervalo = 60 / d.rpm;
+  return permiteDisparo(false, intervalo * 2, 0, d.rpm) === true;
+})());
+ok('quadro longo nunca dispara mais de uma vez', (() => {
+  const d = WEAPON_BY_ID.mp5;
+  let ultimo = -999, tiros = 0, tirosPorQuadro = 0;
+  for (let f = 0; f < 20; f++) {
+    const t = f * 0.5;
+    if (permiteDisparo(true, t, ultimo, d.rpm)) { ultimo = t; tiros++; tirosPorQuadro = 1; }
+  }
+  return tiros === 20 && tirosPorQuadro === 1 && tiros <= d.magSize;
+})());
+
+const wTiro = armaNua();
+ok('arma em estado inicial pronta para fogo', wTiro.canFire() === true && wTiro.def.mag === wTiro.def.magSize);
+ok('um disparo consome exatamente uma municao', (() => {
+  const antes = wTiro.def.mag;
+  const res = wTiro.fire(0);
+  return !!res && res.type === 'bullet' && wTiro.def.mag === antes - 1;
+})());
+ok('pente vazio nao gera disparo nem municao negativa', (() => {
+  const w = armaNua();
+  w.def.mag = 0;
+  const res = w.fire(0);
+  return res === null && w.def.mag === 0;
+})());
+ok('gatilho segurado respeita a cadencia real', (() => {
+  const w = armaNua();
+  const d = w.def;
+  const dt = 1 / 60;
+  let ultimo = -999, tiros = 0;
+  for (let f = 0; f < 60; f++) {
+    const t = f * dt;
+    if (permiteDisparo(d.auto, t, ultimo, d.rpm) && w.canFire()) { ultimo = t; w.fire(t); tiros++; }
+  }
+  const maximo = Math.floor(0.99 / (60 / d.rpm)) + 1;
+  return tiros > 2 && tiros <= maximo && w.def.mag === d.magSize - tiros;
+})());
+ok('troca de arma bloqueia o fogo e volta depois', (() => {
+  const w = armaNua();
+  w.switchTo(5);
+  const bloqueado = w.canFire() === false && w.fire(1) === null;
+  w.update(0.5, OPTS);
+  const liberado = w.canFire() === true && !!w.fire(1.2);
+  return bloqueado && liberado && w.slot === 5;
+})());
+ok('escopeta consome uma municao por disparo', (() => {
+  const w = armaNua();
+  w.switchTo(5);
+  w.update(0.5, OPTS);
+  const antes = w.def.mag;
+  const res = w.fire(1.5);
+  return !!res && w.def.mag === antes - 1 && contagemDeProjeteis(w.def) === w.def.pelletCount;
+})());
+ok('recarga repoe o pente uma unica vez', (() => {
+  const w = armaNua();
+  w.def.mag = 0;
+  w.def.reserve = 30;
+  const primeiro = w.startReload();
+  const duplicado = w.startReload();
+  let guarda = 0;
+  let transferencias = 0;
+  while (w.anim.reloading && guarda++ < 1200) {
+    w.update(1 / 60, OPTS);
+    if (!w.anim.reloading) transferencias++;
+  }
+  return primeiro === true && !duplicado && transferencias === 1 && w.def.mag === w.def.magSize && w.def.reserve === 30 - w.def.magSize;
+})());
+ok('recarga nao dispara nem consome municao extra', (() => {
+  const w = armaNua();
+  w.def.mag = 0;
+  w.def.reserve = 30;
+  w.startReload();
+  const antes = w.def.reserve;
+  let guarda = 0;
+  while (w.anim.reloading && guarda++ < 1200) w.update(1 / 60, OPTS);
+  return w.def.reserve === antes - w.def.magSize;
+})());
+ok('disparo nao altera dano nem cadencia da arma', (() => {
+  const w = armaNua();
+  const d = w.def;
+  const base = { dmg: d.dmg, headMul: d.headMul, rpm: d.rpm, range: d.range, speed: d.speed };
+  w.fire(0);
+  return d.dmg === base.dmg && d.headMul === base.headMul && d.rpm === base.rpm && d.range === base.range && d.speed === base.speed;
+})());
+
+const wPreset = armaNua();
+const autoridade = wPreset.defs.map(d => ({ dmg: d.dmg, headMul: d.headMul, rpm: d.rpm, magSize: d.magSize, range: d.range, speed: d.speed, pelletCount: d.pelletCount }));
+const sensacaoOriginal = wPreset.defs.map(d => ({ sway: d.sway ? d.sway.swayScale : null, adsIn: d.ads ? d.ads.inTime : null, adsOut: d.ads ? d.ads.outTime : null }));
+for (const p of Object.values(WEAPON_SENSE_PRESETS)) wPreset.aplicarSensacao(p);
+ok('presets de sensacao preservam dano, cadencia e municao', wPreset.defs.every((d, i) => {
+  const a = autoridade[i];
+  return d.dmg === a.dmg && d.headMul === a.headMul && d.rpm === a.rpm && d.magSize === a.magSize &&
+    d.range === a.range && d.speed === a.speed && d.pelletCount === a.pelletCount;
+}));
+ok('presets de sensacao realmente alteram a sensacao', (() => {
+  const i = wPreset.defs.findIndex(d => d.id === 'ak');
+  const antes = sensacaoOriginal[i];
+  const agora = wPreset.defs[i];
+  const p = WEAPON_SENSE_PRESETS.competitivo;
+  return perto(agora.sway.swayScale, antes.sway * p.sway, 1e-4) && perto(agora.ads.inTime, antes.adsIn * p.adsIn, 1e-4);
+})());
+ok('presets de sensacao nao acumulam ao reaplicar', (() => {
+  const copia = wPreset.defs.map(d => (d.sway ? d.sway.swayScale : null));
+  for (const p of Object.values(WEAPON_SENSE_PRESETS)) wPreset.aplicarSensacao(p);
+  return wPreset.defs.every((d, i) => !d.sway || perto(d.sway.swayScale, copia[i], 1e-9));
+})());
+
+function controladorCom(def, optic) {
+  const c = new WeaponAnimationController({ weaponSway: 1, bobScale: 1, shakeScale: 1 });
+  c.setWeapon({
+    ...def,
+    recoilProfile: RECOIL_PROFILE[def.recoil],
+    sprintPose: SPRINT_PROFILE[def.class],
+    ads: { ...def.ads, ...ADS_PROFILE[def.class] },
+  }, null, optic);
+  return c;
+}
+const OPTICA_RIFLE = new THREE.Vector3(0, VIEWMODEL.adsAlign.rifle, -0.02);
+const ctxAndando = { ...ctxAnim, velocity: new THREE.Vector3(1.4, 0, -1.8) };
+const ctxCorrendo = { ...ctxAnim, velocity: new THREE.Vector3(0, 0, -5.2), running: true };
+
+const spr = new SprintPoseComponent();
+spr.setPose(SPRINT_PROFILE.rifle);
+let kPico = 0, posturaDentro = true;
+for (let i = 0; i < 180; i++) {
+  const o = spr.update(1 / 60, { sprinting: true, grounded: true, adsK: 0 });
+  kPico = Math.max(kPico, o.k);
+  if (Math.abs(o.x) > SPRINT_PROFILE.rifle.maxTranslation + 1e-9 || Math.abs(o.y) > SPRINT_PROFILE.rifle.maxTranslation + 1e-9) posturaDentro = false;
+  if (Math.abs(o.rx) > SPRINT_PROFILE.rifle.maxRotation + 1e-9 || Math.abs(o.ry) > SPRINT_PROFILE.rifle.maxRotation + 1e-9) posturaDentro = false;
+}
+ok('postura de corrida converge e respeita os limites', kPico > 0.98 && kPico <= 1 && posturaDentro, String(kPico));
+ok('postura de corrida respeita piso e ADS', (() => {
+  const s = new SprintPoseComponent();
+  s.setPose(SPRINT_PROFILE.rifle);
+  for (let i = 0; i < 120; i++) s.update(1 / 60, { sprinting: true, grounded: false, adsK: 0 });
+  const noAr = s.k;
+  for (let i = 0; i < 120; i++) s.update(1 / 60, { sprinting: true, grounded: true, adsK: 1 });
+  return noAr < 0.02 && s.k < 0.02;
+})());
+ok('postura de corrida nao acumula desvio em ciclos', (() => {
+  const s = new SprintPoseComponent();
+  s.setPose(SPRINT_PROFILE.rifle);
+  let pior = 0;
+  for (let ciclo = 0; ciclo < 10; ciclo++) {
+    for (let i = 0; i < 120; i++) s.update(1 / 60, { sprinting: true, grounded: true, adsK: 0 });
+    let r;
+    for (let i = 0; i < 240; i++) r = s.update(1 / 60, { sprinting: false, grounded: true, adsK: 0 });
+    pior = Math.max(pior, Math.hypot(r.x, r.y, r.z), Math.abs(r.rx), Math.abs(r.ry), Math.abs(r.rz));
+  }
+  return pior < 1e-3;
+})());
+
+ok('oscilacao de passo fica dentro do orcamento de cada arma', ARMAS_DE_FOGO.every(w => {
+  const s = new SwayComponent();
+  s.setProfile(w.sway);
+  let pior = 0;
+  for (let i = 0; i < 240; i++) {
+    const o = s.update(1 / 60, {
+      config: { weaponSway: 1, bobScale: 1 }, adsK: 0, lookX: 0, lookY: 0,
+      velocity: new THREE.Vector3(0, 0, -5.2), camYaw: 0, grounded: true, running: true, dtScale: 1,
+    });
+    pior = Math.max(pior, Math.abs(o.y));
+  }
+  return pior <= VIEWMODEL.limits.bob;
+}));
+
+const cCorrida = controladorCom(WEAPON_BY_ID.ak, OPTICA_RIFLE);
+function percorrer(ctrl, dt, passos, ctx) {
+  let o = null;
+  for (let i = 0; i < passos; i++) o = ctrl.update(dt, ctx);
+  return o;
+}
+const corrida60 = percorrer(cCorrida, 1 / 60, 90, ctxCorrendo);
+const corrida30 = percorrer(controladorCom(WEAPON_BY_ID.ak, OPTICA_RIFLE), 1 / 30, 45, ctxCorrendo);
+const corrida120 = percorrer(controladorCom(WEAPON_BY_ID.ak, OPTICA_RIFLE), 1 / 120, 180, ctxCorrendo);
+const corrida144 = percorrer(controladorCom(WEAPON_BY_ID.ak, OPTICA_RIFLE), 1 / 144, 216, ctxCorrendo);
+ok('postura fica estavel entre 30 e 144 FPS', [corrida30, corrida120, corrida144].every(o =>
+  finito(o.pos.x, o.pos.y, o.pos.z, o.rot.x, o.rot.y, o.rot.z, o.fov) &&
+  Math.abs(o.pos.x - corrida60.pos.x) < 0.006 && Math.abs(o.pos.y - corrida60.pos.y) < 0.006 && Math.abs(o.pos.z - corrida60.pos.z) < 0.006),
+  [corrida30.pos.y, corrida120.pos.y, corrida144.pos.y].map(v => v.toFixed(4)).join(' '));
+ok('corrida desloca a arma para baixo do quadril', corrida60.pos.y < VIEWMODEL.basePos.rifle.y && corrida60.rot.z < 0);
+
+const cVolta = controladorCom(WEAPON_BY_ID.ak, OPTICA_RIFLE);
+percorrer(cVolta, 1 / 60, 120, ctxCorrendo);
+const paradoAntes = percorrer(cVolta, 1 / 60, 1, ctxAnim);
+percorrer(cVolta, 1 / 60, 240, ctxAnim);
+const paradoDepois = percorrer(cVolta, 1 / 60, 1, ctxAnim);
+ok('arma retorna ao quadril depois da corrida', cVolta.sprintOut.k < 0.01 &&
+  Math.abs(paradoDepois.pos.x - paradoAntes.pos.x) < 0.004 && Math.abs(paradoDepois.pos.z - paradoAntes.pos.z) < 0.004 &&
+  Math.abs(paradoDepois.pos.x - VIEWMODEL.basePos.rifle.x) < 0.02, String(cVolta.sprintOut.k));
+
+function adsEm(taxa, segundos) {
+  const c = controladorCom(WEAPON_BY_ID.ak, OPTICA_RIFLE);
+  c.requestADS(true);
+  const passos = Math.round(taxa * segundos);
+  const o = percorrer(c, 1 / taxa, passos, ctxAnim);
+  return { c, o };
+}
+ok('ADS converge para a linha da optica', (() => {
+  const { c, o } = adsEm(60, 2);
+  return perto(o.pos.x, -OPTICA_RIFLE.x, 0.001) && perto(o.pos.y, -OPTICA_RIFLE.y, 0.001) &&
+    perto(o.pos.z, VIEWMODEL.adsPos.rifle.z, 0.001) && c.alinhamento <= c.adsTolerance;
+})());
+ok('ADS mantem alinhamento em 30, 60, 120 e 144 FPS', [30, 60, 120, 144].every(t => {
+  const { c, o } = adsEm(t, 2.5);
+  return c.alinhamento <= c.adsTolerance && finito(o.pos.x, o.pos.y, o.pos.z) && Math.abs(o.pos.x + OPTICA_RIFLE.x) < 0.003;
+}));
+ok('ADS reduz sway, passo e inercia em relacao ao quadril', (() => {
+  const quadril = controladorCom(WEAPON_BY_ID.ak, OPTICA_RIFLE);
+  const mirando = controladorCom(WEAPON_BY_ID.ak, OPTICA_RIFLE);
+  mirando.requestADS(true);
+  let swQuadril = 0, swMira = 0, bobQuadril = 0, bobMira = 0;
+  for (let i = 0; i < 240; i++) {
+    quadril.update(1 / 60, ctxAndando);
+    mirando.update(1 / 60, ctxAndando);
+    swQuadril = Math.max(swQuadril, Math.abs(quadril.swayOut.x));
+    swMira = Math.max(swMira, Math.abs(mirando.swayOut.x));
+    bobQuadril = Math.max(bobQuadril, Math.abs(quadril.swayOut.y));
+    bobMira = Math.max(bobMira, Math.abs(mirando.swayOut.y));
+  }
+  return swMira < swQuadril * 0.5 && bobMira < bobQuadril * 0.6;
+})());
+ok('corrida perde influencia durante o ADS', (() => {
+  const c = controladorCom(WEAPON_BY_ID.ak, OPTICA_RIFLE);
+  c.requestADS(true);
+  for (let i = 0; i < 180; i++) c.update(1 / 60, ctxCorrendo);
+  return c.sprintOut.k < 0.05 && c.adsK > 0.98;
+})());
+ok('ADS nao acumula desvio depois de ciclos repetidos', (() => {
+  const c = controladorCom(WEAPON_BY_ID.ak, OPTICA_RIFLE);
+  let pior = 0;
+  for (let ciclo = 0; ciclo < 10; ciclo++) {
+    c.requestADS(true);
+    for (let i = 0; i < 120; i++) c.update(1 / 60, ctxAnim);
+    pior = Math.max(pior, c.alinhamento);
+    c.requestADS(false);
+    for (let i = 0; i < 120; i++) c.update(1 / 60, ctxAnim);
+  }
+  const hip = VIEWMODEL.basePos.rifle;
+  const o = c.update(1 / 60, ctxAnim);
+  return pior <= c.adsTolerance && Math.abs(o.pos.x - hip.x) < 0.006 && Math.abs(o.pos.z - hip.z) < 0.006;
+})());
+ok('ADS permanece finito com delta time irregular', (() => {
+  const c = controladorCom(WEAPON_BY_ID.ak, OPTICA_RIFLE);
+  c.requestADS(true);
+  let semente = 12345, piorDesvio = 0, nan = false;
+  const aleatorio = () => { semente = (semente * 1103515245 + 12345) & 0x7fffffff; return semente / 0x7fffffff; };
+  for (let i = 0; i < 900; i++) {
+    const dt = 1 / 144 + aleatorio() * (1 / 24 - 1 / 144);
+    const o = c.update(dt, ctxCorrendo);
+    if (!finito(o.pos.x, o.pos.y, o.pos.z, o.rot.x, o.rot.y, o.rot.z, o.fov, o.adsK)) nan = true;
+    if (o.adsK > 0.99) piorDesvio = Math.max(piorDesvio, Math.abs(o.pos.x + OPTICA_RIFLE.x), Math.abs(o.pos.y + OPTICA_RIFLE.y));
+  }
+  return !nan && piorDesvio <= c.adsMaxTranslation + 1e-6;
+})());
+ok('ADS nao deixa a camera atravessar a optica', (() => {
+  const { o } = adsEm(60, 2);
+  return o.pos.z < 0 && o.pos.z > -0.5 && Math.abs(o.rot.x) < 0.05 && Math.abs(o.rot.y) < 0.05;
+})());
+ok('painel de calibracao fica inerte fora do modo de depuracao', initWeaponDebug({ weapons: { defs: [] }, state: {}, fx: {}, phys: {} }) === null);
+
+ok('presets visuais cobrem os tres modos de leitura', ['clareza', 'cinematografico', 'competitivo'].every(k => !!VISUAL_PRESETS[k]) && visualDe('inexistente') === VISUAL_PRESETS.clareza);
+const CHAVES_VISUAIS = ['id', 'label', 'exposure', 'vignette', 'contrast', 'sat', 'chroma', 'grain', 'bloom', 'shadowLift', 'midtoneGain', 'highlightCompress', 'minLuminance', 'hemi', 'ambient', 'moon', 'rim'];
+ok('presets visuais so alteram renderizacao', Object.values(VISUAL_PRESETS).every(p => Object.keys(p).every(k => CHAVES_VISUAIS.includes(k))));
+ok('presets visuais tem valores finitos', Object.values(VISUAL_PRESETS).every(p => Object.entries(p).every(([k, v]) => typeof v === 'string' || finito(v))));
+ok('preset cinematografico e mais escuro e fechado', VISUAL_PRESETS.cinematografico.exposure < VISUAL_PRESETS.clareza.exposure && VISUAL_PRESETS.cinematografico.vignette > VISUAL_PRESETS.clareza.vignette);
+ok('preset claridade levanta os escuros', VISUAL_PRESETS.clareza.shadowLift > VISUAL_PRESETS.cinematografico.shadowLift && VISUAL_PRESETS.clareza.midtoneGain > 1);
+ok('preset competitivo prioriza leitura', VISUAL_PRESETS.competitivo.vignette < VISUAL_PRESETS.clareza.vignette && VISUAL_PRESETS.competitivo.exposure >= VISUAL_PRESETS.clareza.exposure);
+ok('brilho respeita a faixa segura', valorSeguro('brightness', 9) === LIMITES_SEGUROS.brightness[1] && valorSeguro('brightness', 0) === LIMITES_SEGUROS.brightness[0] && LIMITES_SEGUROS.brightness[0] < 1 && LIMITES_SEGUROS.brightness[1] > 1);
+ok('configuracao invalida cai no padrao', valorSeguro('brightness', NaN) === DEFAULTS.brightness && valorSeguro('brightness', 'texto') === DEFAULTS.brightness && valorSeguro('vignetteScale', Infinity) === DEFAULTS.vignetteScale);
+ok('brilho persiste na configuracao', Settings.set('brightness', 1.2, true) === 1.2 && Settings.get('brightness') === 1.2);
+ok('brilho e vinheta sao independentes', (() => {
+  Settings.set('vignetteScale', 0.3, true);
+  const a = Settings.get('brightness') === 1.2 && Settings.get('vignetteScale') === 0.3;
+  Settings.set('brightness', 1.1, true);
+  return a && Settings.get('vignetteScale') === 0.3 && Settings.get('brightness') === 1.1;
+})());
+ok('configuracao fora da faixa e corrigida ao gravar', Settings.set('brightness', 40, true) === LIMITES_SEGUROS.brightness[1] && Settings.get('brightness') === LIMITES_SEGUROS.brightness[1]);
+ok('restaurar padrao remove o brilho customizado', (() => {
+  Settings.reset();
+  return Settings.get('brightness') === DEFAULTS.brightness && Settings.get('vignetteScale') === DEFAULTS.vignetteScale && Settings.get('visual') === DEFAULTS.visual;
 })());
 
 console.log('testes ok: ' + passou);

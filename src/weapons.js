@@ -1,9 +1,10 @@
 import * as THREE from '../vendor/three.module.js';
 import { clamp, dampF } from './physics.js';
-import { WEAPONS, RECOIL_PROFILE, VIEWMODEL } from './config/weapon-data.js';
+import { WEAPONS, RECOIL_PROFILE, VIEWMODEL, ADS_PROFILE, SPRINT_PROFILE } from './config/weapon-data.js';
 import { Settings } from './config/settings.js';
 import { WeaponAnimationController } from './weapon/anim-controller.js';
 import { AttachmentHost } from './weapon/attachments.js';
+import { lonaGrao } from './lona.js';
 
 const _camPos = new THREE.Vector3();
 const _camDir = new THREE.Vector3(0, 0, -1);
@@ -25,7 +26,7 @@ function escurecer(hex, k) {
 
 function grainCanvas(base, grain, scratches, wear, grooves) {
   if (base.charAt(0) === '#') base = escurecer(base, 0.5);
-  const c = document.createElement('canvas'); c.width = c.height = 512;
+  const c = lonaGrao(512);
   const g = c.getContext('2d');
   g.fillStyle = base; g.fillRect(0, 0, 512, 512);
   for (let i = 0; i < 9000; i++) {
@@ -102,6 +103,8 @@ export class Weapons {
     this.defs = WEAPONS.map(w => ({
       ...w,
       recoilProfile: w.recoil ? RECOIL_PROFILE[w.recoil] : null,
+      sprintPose: SPRINT_PROFILE[w.class] || null,
+      ads: { ...(w.ads || {}), ...(ADS_PROFILE[w.class] || {}) },
     }));
     this.SLOT_RIFLE = 0; this.SLOT_DEAGLE = 1; this.SLOT_SNIPER = 2; this.SLOT_GRENADE = 3;
     this.SLOT_MP5 = 4; this.SLOT_PUMP = 5;
@@ -165,6 +168,42 @@ export class Weapons {
     this.anim.setProbe(fn);
   }
 
+  aplicarSensacao(p) {
+    if (!p) return;
+    if (!this.sensacaoBase) {
+      this.sensacaoBase = this.defs.map(d => ({
+        sway: d.sway ? { ...d.sway } : null,
+        ads: d.ads ? { ...d.ads } : null,
+        recoilProfile: d.recoilProfile || null,
+        sprintPose: d.sprintPose ? { ...d.sprintPose } : null,
+      }));
+    }
+    this.defs.forEach((d, i) => {
+      const b = this.sensacaoBase[i];
+      if (!b) return;
+      if (b.sway) d.sway = { ...b.sway, swayScale: b.sway.swayScale * p.sway, bob: b.sway.bob * p.sway, breath: b.sway.breath * p.sway };
+      if (b.ads) d.ads = { ...b.ads, inTime: b.ads.inTime * p.adsIn, outTime: b.ads.outTime * p.adsOut };
+      if (b.recoilProfile) d.recoilProfile = {
+        ...b.recoilProfile,
+        kick: b.recoilProfile.kick * p.recoil,
+        kickYaw: b.recoilProfile.kickYaw * p.recoil,
+        camKick: b.recoilProfile.camKick * p.camKick,
+      };
+      if (b.sprintPose) d.sprintPose = {
+        ...b.sprintPose,
+        transitionIn: b.sprintPose.transitionIn / p.transition,
+        transitionOut: b.sprintPose.transitionOut / p.transition,
+        maxTranslation: Math.min(0.16, b.sprintPose.maxTranslation * p.sprint),
+        maxRotation: Math.min(0.55, b.sprintPose.maxRotation * p.sprint),
+      };
+    });
+    if (this.fx && this.fx.setPresetFlash) this.fx.setPresetFlash(p.flash);
+    if (this.anim && !this.anim.reloading) {
+      const d = this.def;
+      this.anim.setWeapon(d, this.currentParts(), this.opticLocalFor(d));
+    }
+  }
+
   setAmbient(v) {
     this.ambient = clamp(v, 0, 1);
   }
@@ -187,7 +226,7 @@ export class Weapons {
     const poly = texPair(grainCanvas('#22252a', 0.12, 8, 0.10, false));
     const olive = texPair(grainCanvas('#46533a', 0.12, 6, 0.14, true));
 
-    const woodC = document.createElement('canvas'); woodC.width = woodC.height = 512;
+    const woodC = lonaGrao(512);
     {
       const g = woodC.getContext('2d');
       g.fillStyle = '#7a4a26'; g.fillRect(0, 0, 512, 512);
@@ -559,7 +598,7 @@ export class Weapons {
     this.vmScene = new THREE.Scene();
     this.vmScene.add(g);
     this.vmGroup = g;
-    this.vmCamera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.01, 5);
+    this.vmCamera = new THREE.PerspectiveCamera(62, (typeof innerWidth === 'number' ? innerWidth : 1280) / (typeof innerHeight === 'number' ? innerHeight : 720), 0.01, 5);
     const vmLight = new THREE.DirectionalLight(0xffcf9c, 0.95);
     vmLight.position.set(1.1, 0.9, 0.55);
     const vmFill = new THREE.DirectionalLight(0x9fb8e8, 0.3);
@@ -834,14 +873,12 @@ export class Weapons {
     const quatCam = this.camera.quaternion;
 
     if (this.sight && this.sight.group.visible) {
-      this.sight.group.getWorldPosition(_lente);
-      _olhoLente.copy(_lente).normalize();
       _lenteEixo.set(0, 0, -1).applyQuaternion(this.vmGroup.quaternion).normalize();
       this.sight.update(dt, {
         ambient: this.ambient,
         adsK: out.adsK,
-        eyeToLens: _olhoLente,
         axisDir: _lenteEixo,
+        cameraAxis: _olhoLente.set(0, 0, -1),
       });
     }
 
