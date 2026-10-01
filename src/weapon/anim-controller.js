@@ -1,6 +1,8 @@
 import * as THREE from '../../vendor/three.module.js';
-import { AimDownSightsComponent, SwayComponent, RecoilComponent, WeaponCollisionComponent, damp, clampN } from './layers.js';
+import { AimDownSightsComponent, SwayComponent, RecoilComponent, WeaponCollisionComponent, SprintPoseComponent, damp, clampN } from './layers.js';
 import { VIEWMODEL, ease } from '../config/weapon-data.js';
+
+const ROT_ZERO = { x: 0, y: 0, z: 0 };
 
 export class WeaponAnimationController {
   constructor(config) {
@@ -9,6 +11,22 @@ export class WeaponAnimationController {
     this.sway = new SwayComponent();
     this.recoil = new RecoilComponent();
     this.collision = new WeaponCollisionComponent();
+    this.sprint = new SprintPoseComponent();
+
+    this.adsSway = 0.15;
+    this.adsBob = 0.1;
+    this.adsInertia = 0.15;
+    this.adsBreath = 0.1;
+    this.adsRecoil = 0.45;
+    this.adsMaxTranslation = 0.0035;
+    this.adsMaxRotation = 0.02;
+    this.adsTolerance = 0.004;
+    this.alinhamento = 0;
+    this.congelar = false;
+    this.sprintOut = null;
+    this.swayOut = null;
+    this.recoilOut = null;
+    this.colOut = null;
 
     this.weapon = null;
     this.model = 'rifle';
@@ -54,7 +72,18 @@ export class WeaponAnimationController {
       this.sway.setProfile(data.sway);
       this.recoil.setProfile(data.recoilProfile || null);
       this.collision.setProfile(data.collision);
+      this.sprint.setPose(data.sprintPose);
+      const a = data.ads || {};
+      this.adsSway = a.swayMultiplier !== undefined ? a.swayMultiplier : 0.15;
+      this.adsBob = a.bobMultiplier !== undefined ? a.bobMultiplier : 0.1;
+      this.adsInertia = a.inertiaMultiplier !== undefined ? a.inertiaMultiplier : 0.15;
+      this.adsBreath = a.breathingMultiplier !== undefined ? a.breathingMultiplier : 0.1;
+      this.adsRecoil = a.recoilMultiplier !== undefined ? a.recoilMultiplier : 0.45;
+      this.adsMaxTranslation = a.maxTranslation !== undefined ? a.maxTranslation : 0.0035;
+      this.adsMaxRotation = a.maxRotation !== undefined ? a.maxRotation : 0.02;
+      this.adsTolerance = a.alignmentTolerance !== undefined ? a.alignmentTolerance : 0.004;
     }
+    this.sprint.reset();
     this.captureParts();
   }
 
@@ -208,13 +237,20 @@ export class WeaponAnimationController {
   update(dt, ctx) {
     const cfg = this.config;
     const adsK = this.ads.update(dt);
+    const dtProc = this.congelar ? 0 : dt;
 
     if (this.switchT > 0) this.switchT = Math.max(0, this.switchT - dt);
     if (this.inspectT > 0) this.inspectT = Math.max(0, this.inspectT - dt);
     this.advanceReload(dt);
     if (this.jamK > 0) this.jamK = Math.max(0, this.jamK - dt * 2);
 
-    const swayOut = this.sway.update(dt, {
+    const sprintOut = this.sprint.update(dtProc, {
+      sprinting: !!ctx.running,
+      grounded: ctx.grounded,
+      adsK,
+    });
+
+    const swayOut = this.sway.update(dtProc, {
       config: cfg,
       adsK,
       lookX: ctx.lookX || 0,
@@ -224,29 +260,41 @@ export class WeaponAnimationController {
       grounded: ctx.grounded,
       running: ctx.running,
       dtScale: ctx.dtScale,
+      adsSwayScale: 1 - adsK * (1 - this.adsSway),
+      adsBobScale: 1 - adsK * (1 - this.adsBob),
+      adsInertiaScale: 1 - adsK * (1 - this.adsInertia),
+      adsBreathScale: 1 - adsK * (1 - this.adsBreath),
+      locomotionSwayScale: sprintOut.swayMultiplier,
+      locomotionBobScale: sprintOut.bobMultiplier,
     });
 
-    const recoilOut = this.recoil.update(dt, cfg);
-    const colOut = this.collision.update(dt, {
+    const recoilOut = this.recoil.update(dtProc, cfg);
+    const colOut = this.collision.update(dtProc, {
       origin: ctx.origin,
       forward: ctx.forward,
       right: ctx.right,
       adsK,
     });
 
+    this.sprintOut = sprintOut;
+    this.swayOut = swayOut;
+    this.recoilOut = recoilOut;
+    this.colOut = colOut;
+
     const base = VIEWMODEL.basePos[this.model] || VIEWMODEL.basePos.rifle;
     const ads = VIEWMODEL.adsPos[this.model] || VIEWMODEL.adsPos.rifle;
 
-    const alvoX = adsK > 0 ? -this.opticLocal.x : base.x;
-    const alvoY = adsK > 0 ? -this.opticLocal.y : base.y;
+    const adsX = -this.opticLocal.x;
+    const adsY = -this.opticLocal.y;
     const hipZ = base.z, adsZ = ads.z;
 
     const suave = 1 - Math.pow(1 - clampN(adsK, 0, 1), 3);
-    let px = base.x + (alvoX - base.x) * suave;
-    let py = base.y + (alvoY - base.y) * suave;
+    let px = base.x + (adsX - base.x) * suave;
+    let py = base.y + (adsY - base.y) * suave;
     let pz = hipZ + (adsZ - hipZ) * suave;
 
-    let rx = 0, ry = 0, rz = 0;
+    const baseRot = VIEWMODEL.baseRot[this.model] || ROT_ZERO;
+    let rx = baseRot.x, ry = baseRot.y, rz = baseRot.z;
 
     const sw = this.switchT > 0 ? Math.sin(clampN(this.switchT / this.switchDur, 0, 1) * Math.PI) : 0;
     py -= sw * 0.25;
@@ -278,13 +326,35 @@ export class WeaponAnimationController {
       throwRot = p * p * 0.7;
     }
 
-    px += swayOut.x + colOut.x + recoilOut.x;
-    py += swayOut.y + colOut.y + recoilOut.y + swayOut.breathY - reloadDrop - inspectLift;
-    pz += swayOut.z + colOut.z + recoilOut.z + throwZ;
+    const proc = {
+      x: swayOut.x + colOut.x + sprintOut.x,
+      y: swayOut.y + colOut.y + sprintOut.y + swayOut.breathY - reloadDrop - inspectLift,
+      z: swayOut.z + colOut.z + sprintOut.z,
+      rx: swayOut.rx + colOut.rx + sprintOut.rx + swayOut.breath * 0.5,
+      ry: swayOut.ry + colOut.ry + sprintOut.ry,
+      rz: swayOut.rz + colOut.rz + sprintOut.rz + swayOut.breathRoll,
+    };
+    if (adsK > 0.001) {
+      const limiteT = this.adsMaxTranslation * adsK;
+      const limiteR = this.adsMaxRotation * adsK;
+      proc.x = clampN(proc.x, -limiteT, limiteT);
+      proc.y = clampN(proc.y, -limiteT, limiteT);
+      proc.z = clampN(proc.z, -limiteT, limiteT);
+      proc.rx = clampN(proc.rx, -limiteR, limiteR);
+      proc.ry = clampN(proc.ry, -limiteR, limiteR);
+      proc.rz = clampN(proc.rz, -limiteR, limiteR);
+    }
+    this.alinhamento = Math.hypot(py + proc.y - adsY, px + proc.x - adsX);
 
-    rx += recoilOut.rx + swayOut.rx + colOut.rx + reloadRot * 0.5 + throwRot + swayOut.breath * 0.5;
-    ry += recoilOut.ry + swayOut.ry + colOut.ry + reloadRot * 0.4 + inspectRot;
-    rz += recoilOut.rz + swayOut.rz + colOut.rz + reloadRoll + inspectRoll + swayOut.breathRoll;
+    const escalaRecuo = 1 - adsK * (1 - this.adsRecoil);
+
+    px += proc.x + recoilOut.x * escalaRecuo;
+    py += proc.y + recoilOut.y * escalaRecuo;
+    pz += proc.z + recoilOut.z * escalaRecuo + throwZ;
+
+    rx += proc.rx + recoilOut.rx * escalaRecuo + reloadRot * 0.5 + throwRot;
+    ry += proc.ry + recoilOut.ry * escalaRecuo + reloadRot * 0.4 + inspectRot;
+    rz += proc.rz + recoilOut.rz * escalaRecuo + reloadRoll + inspectRoll;
 
     if (this.parts && this.parts.slide && this.partBase.has('slide')) {
       const base = this.partBase.get('slide');
@@ -311,6 +381,11 @@ export class WeaponAnimationController {
     this._out.reloadStage = this.reloadStage;
     this._out.magHand = magHand;
     this._out.switching = sw;
+    this._out.sprintK = sprintOut.k;
+    this._out.alignment = this.alinhamento;
+    this._out.tolerance = this.adsTolerance;
+    this._out.walking = swayOut.andando;
+    this._out.running = swayOut.corrida;
     return this._out;
   }
 

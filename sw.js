@@ -1,4 +1,4 @@
-const CACHE = 'urbana.v20';
+const CACHE = 'urbana.v21';
 const ESSENCIAIS = [
   './',
   'index.html',
@@ -9,6 +9,7 @@ const ESSENCIAIS = [
   'icon512.png',
   'docs/banner.svg',
   'src/main.js',
+  'src/lona.js',
   'src/world.js',
   'src/textures.js',
   'src/render.js',
@@ -24,6 +25,8 @@ const ESSENCIAIS = [
   'src/weapon/layers.js',
   'src/weapon/anim-controller.js',
   'src/weapon/attachments.js',
+  'src/weapon/debug.js',
+  'src/weapon/disparo.js',
   'vendor/three.module.js',
 ];
 

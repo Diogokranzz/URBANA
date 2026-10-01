@@ -47,6 +47,10 @@ uniform float uContrast;
 uniform float uSat;
 uniform float uVignette;
 uniform float uGrain;
+uniform float uShadowLift;
+uniform float uMidtoneGain;
+uniform float uHighlightCompress;
+uniform float uMinLuminance;
 uniform float uTime;
 uniform vec3 uShadowTint;
 uniform vec3 uHighlightTint;
@@ -81,6 +85,14 @@ void main() {
   c *= uExposure;
   c = aces(c);
 
+  float lg = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  float faixaSombra = 1.0 - smoothstep(0.0, 0.30, lg);
+  float faixaMedia = smoothstep(0.06, 0.42, lg) * (1.0 - smoothstep(0.55, 0.96, lg));
+  c += vec3(uShadowLift) * faixaSombra;
+  c *= mix(1.0, uMidtoneGain, faixaMedia);
+  c -= uHighlightCompress * max(vec3(0.0), c - vec3(0.84));
+  c = max(c, vec3(uMinLuminance));
+
   float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
   c = mix(c * uShadowTint, c * uHighlightTint, smoothstep(0.12, 0.72, l));
   c = (c - 0.5) * uContrast + 0.5;
@@ -113,7 +125,12 @@ export class Cinema {
       sat: 1.1,
       vignette: 0.52,
       grain: 0.026,
+      shadowLift: 0.03,
+      midtoneGain: 1.1,
+      highlightCompress: 0.22,
+      minLuminance: 0.014,
     };
+    this.baseTone = { ...this.tone };
 
     const hdr = renderer.capabilities.isWebGL2
       && (renderer.extensions.has('EXT_color_buffer_half_float') || renderer.extensions.has('EXT_color_buffer_float'));
@@ -171,6 +188,10 @@ export class Cinema {
         uSat: { value: 1.1 },
         uVignette: { value: 0.62 },
         uGrain: { value: 0.028 },
+        uShadowLift: { value: 0.03 },
+        uMidtoneGain: { value: 1.1 },
+        uHighlightCompress: { value: 0.22 },
+        uMinLuminance: { value: 0.014 },
         uTime: { value: 0 },
         uShadowTint: { value: new THREE.Color(0.92, 0.99, 1.07) },
         uHighlightTint: { value: new THREE.Color(1.08, 1.0, 0.92) },
@@ -194,6 +215,7 @@ export class Cinema {
     this.enabled = true;
     const media = level === 'media';
     this.blurPasses = media ? 1 : 2;
+    const anterior = this.tone || {};
     this.tone = {
       exposure: media ? 1.26 : 1.32,
       bloom: media ? 0.62 : 0.78,
@@ -202,11 +224,36 @@ export class Cinema {
       sat: media ? 1.07 : 1.1,
       vignette: 0.52,
       grain: media ? 0.02 : 0.026,
+      shadowLift: anterior.shadowLift !== undefined ? anterior.shadowLift : 0.03,
+      midtoneGain: anterior.midtoneGain !== undefined ? anterior.midtoneGain : 1.1,
+      highlightCompress: anterior.highlightCompress !== undefined ? anterior.highlightCompress : 0.22,
+      minLuminance: anterior.minLuminance !== undefined ? anterior.minLuminance : 0.014,
     };
     this.blurDown = media ? 0.34 : 0.5;
   }
 
   setExposure(v) {
+    if (this.tone) this.tone.exposure = v;
+  }
+
+  aplicarVisual(p) {
+    if (!p || !this.tone) return;
+    const campos = ['shadowLift', 'midtoneGain', 'highlightCompress', 'minLuminance', 'grain', 'bloom'];
+    for (const c of campos) {
+      if (p[c] !== undefined) this.tone[c] = p[c];
+    }
+    if (p.vignette !== undefined) this.tone.vignette = p.vignette;
+    if (p.contrast !== undefined) this.tone.contrast = p.contrast;
+    if (p.sat !== undefined) this.tone.sat = p.sat;
+    if (p.chroma !== undefined) this.tone.chroma = p.chroma;
+  }
+
+  multiplicarExposicao(k) {
+    if (this.tone) this.tone.exposure = (this.baseExposure !== undefined ? this.baseExposure : this.tone.exposure) * k;
+  }
+
+  fixarExposicaoBase(v) {
+    this.baseExposure = v;
     if (this.tone) this.tone.exposure = v;
   }
 
@@ -283,6 +330,10 @@ export class Cinema {
     u.uSat.value = this.tone.sat;
     u.uVignette.value = this.tone.vignette;
     u.uGrain.value = this.tone.grain;
+    u.uShadowLift.value = this.tone.shadowLift !== undefined ? this.tone.shadowLift : 0;
+    u.uMidtoneGain.value = this.tone.midtoneGain !== undefined ? this.tone.midtoneGain : 1;
+    u.uHighlightCompress.value = this.tone.highlightCompress !== undefined ? this.tone.highlightCompress : 0;
+    u.uMinLuminance.value = this.tone.minLuminance !== undefined ? this.tone.minLuminance : 0;
     this.blit(this.compositeMat, null);
     r.setRenderTarget(null);
   }

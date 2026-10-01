@@ -203,6 +203,9 @@ export function buildWorld(scene, renderer) {
 
   const hemi = new THREE.HemisphereLight(0x4a5c76, 0x1e222a, 3.05);
   scene.add(hemi);
+  const ambientBase = 0.42;
+  const ambient = new THREE.AmbientLight(0x2b3850, ambientBase);
+  scene.add(ambient);
   const moon = new THREE.DirectionalLight(0xb6cbe8, 2.35);
   moon.position.copy(moonDir).multiplyScalar(90);
   moon.castShadow = true;
@@ -1181,6 +1184,14 @@ export function buildWorld(scene, renderer) {
     [0, 2], [-5, -30], [16.5, 29.5], [-48, -30], [48, 30],
   ].map(([x, z]) => new THREE.Vector3(x, 0, z));
 
+  function applyVisual(v) {
+    if (!v) return;
+    if (v.hemi !== undefined) hemi.intensity = 3.05 * v.hemi;
+    if (v.ambient !== undefined) ambient.intensity = ambientBase * v.ambient;
+    if (v.moon !== undefined) moon.intensity = 2.35 * v.moon;
+    if (v.rim !== undefined) rim.intensity = 0.5 * v.rim;
+  }
+
   function applyQuality(level) {
     const media = level === 'media';
     const baixa = level === 'baixa';
@@ -1224,5 +1235,5 @@ export function buildWorld(scene, renderer) {
     void st;
   }
 
-  return { colliders, spawns, coverPoints, sun: moon, driveCars, hemi, animate, applyQuality, sky: skyMesh };
+  return { colliders, spawns, coverPoints, sun: moon, driveCars, hemi, ambient, animate, applyQuality, applyVisual, sky: skyMesh };
 }

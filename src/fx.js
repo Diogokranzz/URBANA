@@ -183,8 +183,8 @@ export class FX {
     this.texSmoke = makeSmokeTex();
     this.texFlash = makeFlashTex();
 
-    this._matCor = new Map();
-    this._matDecal = new Map();
+    this._cacheCor = new Map();
+    this._cacheDecal = new Map();
 
     this.sparkGeo = new THREE.SphereGeometry(0.03, 4, 3);
     this.debrisGeo = new THREE.SphereGeometry(0.045, 4, 3);
@@ -192,8 +192,8 @@ export class FX {
     this.casingGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.05, 6);
     this.decalGeo = new THREE.PlaneGeometry(0.28, 0.28);
 
-    this.sparkPool = pool(scene, 260, () => new THREE.Mesh(this.sparkGeo, this._matCor.get(0xffd28a)));
-    this.debrisPool = pool(scene, 180, () => new THREE.Mesh(this.debrisGeo, this._matCor.get(0x8a8378)));
+    this.sparkPool = pool(scene, 260, () => new THREE.Mesh(this.sparkGeo));
+    this.debrisPool = pool(scene, 180, () => new THREE.Mesh(this.debrisGeo));
     this.smokePool = pool(scene, 110, () => new THREE.Sprite(new THREE.SpriteMaterial({
       map: this.texSmoke, transparent: true, opacity: 0.3, depthWrite: false,
     })));
@@ -256,23 +256,23 @@ export class FX {
   }
 
   _matCor(hex) {
-    let m = this._matCor.get(hex);
+    let m = this._cacheCor.get(hex);
     if (!m) {
       m = new THREE.MeshBasicMaterial({ color: hex });
-      this._matCor.set(hex, m);
+      this._cacheCor.set(hex, m);
     }
     return m;
   }
 
   _matDecal(kind, color) {
-    let m = this._matDecal.get(kind);
+    let m = this._cacheDecal.get(kind);
     if (!m) {
       m = new THREE.MeshBasicMaterial({
         map: this.texHole[kind] || this.texHole.pock,
         color, transparent: true, depthWrite: false, opacity: 0.9,
         polygonOffset: true, polygonOffsetFactor: -4,
       });
-      this._matDecal.set(kind, m);
+      this._cacheDecal.set(kind, m);
     }
     return m;
   }
@@ -282,9 +282,14 @@ export class FX {
     return pre && pre.particles !== undefined ? pre.particles : 1;
   }
 
+  setPresetFlash(k) {
+    this.presetFlash = Number.isFinite(k) ? Math.max(0, k) : 1;
+  }
+
   _flashScale() {
     const v = Settings.get('flashScale');
-    return v === undefined ? 1 : v;
+    const base = v === undefined ? 1 : v;
+    return base * (this.presetFlash === undefined ? 1 : this.presetFlash);
   }
 
   _acendeLuz(pos, cor, intensidade, dur, dist) {
@@ -348,22 +353,25 @@ export class FX {
     const escala = (flashCfg && flashCfg.scale) || 1;
     const escalaTotal = escala * (0.6 + fs * 0.4);
 
+    const giro = Math.random() < 0.5 ? 1 : -1;
+    const tamanho = 0.9 + Math.random() * 0.22;
     const principal = this.flashPool.pega();
     if (principal) {
       principal.visible = true;
       principal.position.copy(pos).addScaledVector(dir, 0.06);
-      principal.scale.setScalar(0.3 * escalaTotal);
+      principal.scale.setScalar(0.26 * escalaTotal * tamanho);
+      principal.material.rotation = giro * (0.2 + Math.random() * 0.5);
       principal.material.opacity = 0.95;
-      this.flashes.push({ sprite: principal, life: 0.055, lifeMax: 0.055, grow: 0.9 });
+      this.flashes.push({ sprite: principal, life: 0.05, lifeMax: 0.05, grow: 0.7 });
     }
-    for (let i = 0; i < 2; i++) {
-      const sec = this.flashPool.pega();
-      if (!sec) break;
-      sec.visible = true;
-      sec.position.copy(pos).addScaledVector(dir, 0.14 + i * 0.1).add(randVec(0.05));
-      sec.scale.setScalar(0.16 * escalaTotal);
-      sec.material.opacity = 0.7;
-      this.flashes.push({ sprite: sec, life: 0.08, lifeMax: 0.08, grow: 0.6 });
+    const secundario = this.flashPool.pega();
+    if (secundario) {
+      secundario.visible = true;
+      secundario.position.copy(pos).addScaledVector(dir, 0.09).add(randVec(0.03));
+      secundario.scale.setScalar(0.11 * escalaTotal * tamanho);
+      secundario.material.rotation = -giro * (0.1 + Math.random() * 0.4);
+      secundario.material.opacity = 0.32;
+      this.flashes.push({ sprite: secundario, life: 0.07, lifeMax: 0.07, grow: 0.5 });
     }
 
     const nFumaca = Math.random() < 0.5 ? 1 : 2;

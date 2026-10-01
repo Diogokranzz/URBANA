@@ -7,7 +7,10 @@ import { Weapons } from './weapons.js';
 import { Enemy, Player, makeOperatorMesh } from './entities.js';
 import { Net } from './net.js';
 import { Cinema } from './render.js';
-import { Settings, aplicarAcessibilidade, GRAPHICS_PRESETS } from './config/settings.js';
+import { Settings, aplicarAcessibilidade, GRAPHICS_PRESETS, VISUAL_PRESETS, visualDe } from './config/settings.js';
+import { WEAPON_SENSE_PRESETS } from './config/weapon-data.js';
+import { initWeaponDebug } from './weapon/debug.js';
+import { contagemDeProjeteis, projeteisComTracer, permiteDisparo } from './weapon/disparo.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setSize(innerWidth, innerHeight);
@@ -32,9 +35,11 @@ const audio = new AudioSys();
 audio.setOclusao((a, b) => { const h = phys.segmentHit(a, b); return !!h && h.t < 0.92; });
 const player = new Player(world.spawns[0].clone().add(new THREE.Vector3(3, 0, 3)));
 const weapons = new Weapons(camera, fx, audio, scene, phys);
+let weaponDebug = null;
 const _wmPos = new THREE.Vector3();
 const _wmDir = new THREE.Vector3();
 const _wmRight = new THREE.Vector3();
+const _wmVelDir = new THREE.Vector3();
 weapons.vmScene.environment = scene.environment;
 const net = new Net(scene);
 
@@ -367,15 +372,31 @@ function applyQuality(q) {
   cinema.setSize();
   cinema.enabled = !!pre.postFx;
   if (cinema.tone) {
-    if (pre.bloom !== undefined) cinema.tone.bloom = pre.bloom;
     if (pre.grain !== undefined) cinema.tone.grain = pre.grain;
-    if (pre.vignette !== undefined) cinema.tone.vignette = pre.vignette;
     if (pre.chroma !== undefined) cinema.tone.chroma = pre.chroma;
-    if (pre.bloomBoost !== undefined) cinema.tone.bloom *= pre.bloomBoost;
   }
+  aplicarVisual(pre.bloomBoost);
   if (world.applyQuality) world.applyQuality(level === 'competitivo' ? 'baixa' : nivelBase);
   if (GRAPHICS_PRESETS[level]) Settings.set('graphics', level, true);
-  document.querySelectorAll('#quality button').forEach(b => b.classList.toggle('on', b.dataset.q === level));
+  // Apenas o grupo de qualidade: os botoes de imagem e sensacao moram nos mesmos
+  // containers '#quality' e seriam desmarcados por nao possuirem data-q.
+  document.querySelectorAll('#quality button[data-q]').forEach(b => b.classList.toggle('on', b.dataset.q === level));
+}
+
+function aplicarVisual(bloomBoost) {
+  const v = visualDe(Settings.get('visual'));
+  const brilho = Settings.get('brightness');
+  const vinheta = v.vignette * Settings.get('vignetteScale');
+  cinema.aplicarVisual({ ...v, vignette: vinheta });
+  if (bloomBoost && cinema.tone) cinema.tone.bloom *= bloomBoost;
+  cinema.fixarExposicaoBase(v.exposure * brilho);
+  if (world.applyVisual) world.applyVisual(v);
+  aplicarSensacaoDeArma();
+}
+
+function aplicarSensacaoDeArma() {
+  const p = WEAPON_SENSE_PRESETS[Settings.get('weaponFeel')] || WEAPON_SENSE_PRESETS.tatico;
+  weapons.aplicarSensacao(p);
 }
 
 let enclosureT = 0;
@@ -401,12 +422,34 @@ function amostrarEnclosure(dt) {
 }
 
 function initQualityUi() {
-  document.querySelectorAll('#quality button').forEach(b => {
+  document.querySelectorAll('#quality button[data-q]').forEach(b => {
     b.addEventListener('click', () => {
       audio.uiPress();
       applyQuality(b.dataset.q);
     });
   });
+  const marcarImagem = () => {
+    document.querySelectorAll('#quality button[data-vis]').forEach(b => b.classList.toggle('on', b.dataset.vis === Settings.get('visual')));
+    document.querySelectorAll('#quality button[data-feel]').forEach(b => b.classList.toggle('on', b.dataset.feel === Settings.get('weaponFeel')));
+  };
+  document.querySelectorAll('#quality button[data-vis]').forEach(b => {
+    b.addEventListener('click', () => {
+      Settings.set('visual', b.dataset.vis);
+      aplicarVisual();
+      aplicarAcessibilidade();
+      marcarImagem();
+      audio.uiPress();
+    });
+  });
+  document.querySelectorAll('#quality button[data-feel]').forEach(b => {
+    b.addEventListener('click', () => {
+      Settings.set('weaponFeel', b.dataset.feel);
+      aplicarSensacaoDeArma();
+      marcarImagem();
+      audio.uiPress();
+    });
+  });
+  marcarImagem();
 }
 
 function initAcessibilidadeUi() {
@@ -423,20 +466,21 @@ function initAcessibilidadeUi() {
       b.classList.toggle('on', Settings.get(b.dataset.acT) !== false);
     });
   };
+  const posAjuste = (chave) => {
+    if (chave === 'sensitivity') state.mouseSens = Settings.get('sensitivity');
+    if (chave === 'brightness' || chave === 'vignetteScale') aplicarVisual();
+    aplicarAcessibilidade();
+  };
   sliders.forEach((el) => {
-    const aplicar = () => {
-      const v = parseFloat(el.value);
-      Settings.set(el.dataset.ac, v);
-      if (el.dataset.ac === 'sensitivity') state.mouseSens = v;
-      aplicarAcessibilidade();
-    };
     el.addEventListener('input', () => {
-      const v = parseFloat(el.value);
-      Settings.set(el.dataset.ac, v, true);
-      if (el.dataset.ac === 'sensitivity') state.mouseSens = v;
-      aplicarAcessibilidade();
+      Settings.set(el.dataset.ac, parseFloat(el.value), true);
+      posAjuste(el.dataset.ac);
     });
-    el.addEventListener('change', () => { aplicar(); audio.uiPress(); });
+    el.addEventListener('change', () => {
+      Settings.set(el.dataset.ac, parseFloat(el.value));
+      posAjuste(el.dataset.ac);
+      audio.uiPress();
+    });
   });
   painel.querySelectorAll('.ac-t[data-ac-t]').forEach((b) => {
     b.addEventListener('click', () => {
@@ -580,6 +624,31 @@ function spawnEnemy() {
   state.enemies.push(e);
 }
 
+
+let avisoEstetica = false;
+function esteticaDoDisparo(d, origin, dir) {
+  try {
+    if (d.sfx === 'pistol') {
+      if (weapons.suppOn) audio.shotSuppressed(null, null, null, null);
+      else audio.shotPistol(null, null, null, null);
+    }
+    else if (d.sfx === 'sniper') audio.shotSniper(null, null, null, null);
+    else if (d.sfx === 'smg') audio.shotSmg(null, null, null, null);
+    else if (d.sfx === 'shotgun') audio.shotShotgun(null, null, null, null);
+    else audio.shotRifle(null, null, null, null);
+    fx.muzzleFlash(origin.clone().addScaledVector(dir, 0.4), dir);
+    if (d.casing) {
+      const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
+      fx.casing(origin.clone().addScaledVector(dir, 0.5).addScaledVector(right, 0.12), right, dir.clone());
+    }
+  } catch (err) {
+    if (!avisoEstetica) {
+      avisoEstetica = true;
+      console.warn('efeitos do disparo falharam', err);
+    }
+  }
+}
+
 function fireBullet() {
   const now = state.time;
   const res = weapons.fire(now);
@@ -589,46 +658,33 @@ function fireBullet() {
     throwGrenade();
     return;
   }
-  net.sendShot(camera.getWorldPosition(new THREE.Vector3()), getDir(), weapons.def.sfx);
 
   const d = weapons.def;
-  if (d.sfx === 'pistol') {
-    if (weapons.suppOn) audio.shotSuppressed(null, null, null, null);
-    else audio.shotPistol(null, null, null, null);
-  }
-  else if (d.sfx === 'sniper') audio.shotSniper(null, null, null, null);
-  else if (d.sfx === 'smg') audio.shotSmg(null, null, null, null);
-  else if (d.sfx === 'shotgun') audio.shotShotgun(null, null, null, null);
-  else audio.shotRifle(null, null, null, null);
-  fx.muzzleFlash(camera.getWorldPosition(new THREE.Vector3()).add(getDir().multiplyScalar(0.4)), getDir());
-
   const origin = camera.getWorldPosition(new THREE.Vector3());
   const dir = getDir();
+
+  net.sendShot(origin, dir, d.sfx);
+  esteticaDoDisparo(d, origin, dir);
+  if (weaponDebug) weaponDebug.registrarDisparo(dir);
+
   const sp = weapons.spread();
-  const pellets = d.pellets || 1;
-  const shots = [];
-  for (let p = 0; p < pellets; p++) {
+  const projeteis = contagemDeProjeteis(d);
+  const tracers = projeteisComTracer(projeteis);
+  const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
+  const up = new THREE.Vector3().crossVectors(right, dir).normalize();
+
+  for (let p = 0; p < projeteis; p++) {
     const sdir = dir.clone();
     if (sp > 0) {
       const rx = (Math.random() - 0.5) * 2 * sp;
       const ry = (Math.random() - 0.5) * 2 * sp;
-      const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
-      const up = new THREE.Vector3().crossVectors(right, dir).normalize();
       sdir.addScaledVector(right, rx).addScaledVector(up, ry).normalize();
     }
-    shots.push(sdir);
+    fireBulletDir(origin, sdir, d, p < tracers);
   }
-
-  if (d.casing) {
-    const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
-    const fw = dir.clone();
-    fx.casing(origin.clone().addScaledVector(dir, 0.5).addScaledVector(right, 0.12), right, fw);
-  }
-
-  for (const sdir of shots) fireBulletDir(origin, sdir, d);
 }
 
-function fireBulletDir(origin, dir, d) {
+function fireBulletDir(origin, dir, d, comTracer) {
   const range = d.range;
   const hitWorld = phys.segmentHit(origin, origin.clone().addScaledVector(dir, range));
 
@@ -646,7 +702,7 @@ function fireBulletDir(origin, dir, d) {
   }
 
   const end = origin.clone().addScaledVector(dir, Math.min(bestT, range));
-  if ((d.pellets || 1) <= 2) fx.tracer(origin.clone().addScaledVector(dir, 1.2).add(new THREE.Vector3(0, -0.05, 0)), end);
+  if (comTracer) fx.tracer(origin.clone().addScaledVector(dir, 1.2).add(new THREE.Vector3(0, -0.05, 0)), end);
 
   if (bestEnemy) {
     const dmg = Math.round(d.dmg * (bestEnemy.isHead ? d.headMul : 1) * (bestT > 60 ? 0.7 : 1));
@@ -1053,7 +1109,7 @@ function renderLoadout() {
     if (i === 1) extra = weapons.suppOn
       ? '<span class="lo-state on">· SUPRESSOR [X]</span>'
       : '<span class="lo-state off">· ABERTA [X]</span>';
-    if (i === 0 || i === 4 || i === 5) extra = '<span class="lo-state">· ' + (d.pellets ? `${d.pellets} projéteis` : d.auto ? 'AUTO' : 'SEMI') + '</span>';
+    if (i === 0 || i === 4 || i === 5) extra = '<span class="lo-state">· ' + (contagemDeProjeteis(d) > 1 ? `${contagemDeProjeteis(d)} projéteis` : d.auto ? 'AUTO' : 'SEMI') + '</span>';
     if (i === 2) extra = '<span class="lo-state">· LUNETA</span>';
     return `<div class="lo-row ${active ? 'active' : ''}">
       <span class="lo-key">${['1','2','3','G','4','5'][i]}</span>
@@ -1126,6 +1182,7 @@ function frame(nowT) {
   state.time += dt;
   update(dt);
   render();
+  if (weaponDebug) weaponDebug.atualizar(dt);
 }
 
 let rotateTipVisible = false;
@@ -1359,6 +1416,7 @@ function update(dt) {
 
   camera.rotation.order = 'YXZ';
   const rec = weapons.consumeRecoil();
+  if (weaponDebug) weaponDebug.recuoCamera = rec;
 
   if (thirdPerson && playerAvatar) {
     const kids = playerAvatar.children;
@@ -1424,6 +1482,7 @@ function update(dt) {
     + player.sprintK * 6;
   camera.fov = dampF(camera.fov, targetFov, 12, dt);
   camera.updateProjectionMatrix();
+  if (weaponDebug) weaponDebug.fovAlvo = targetFov;
   }
 
   amostrarEnclosure(dt);
@@ -1439,14 +1498,18 @@ function update(dt) {
   camera.getWorldPosition(_wmPos);
   _wmDir.copy(getDir());
   _wmRight.copy(rightOf(_wmDir));
+  const forcarAnim = weaponDebug ? weaponDebug.forcarMovimento : null;
+  if (forcarAnim) _wmVelDir.copy(_wmDir).multiplyScalar(forcarAnim.running ? 5.2 : 2.2);
   weapons.update(dt, {
-    moving: vehicle ? false : moving, running: !vehicle && player.sprintK > 0.5, grounded: player.onGround,
+    moving: forcarAnim ? !!forcarAnim.moving : (vehicle ? false : moving),
+    running: forcarAnim ? !!forcarAnim.running : (!vehicle && player.sprintK > 0.5),
+    grounded: player.onGround,
     aimHeld: mouse2Down && state.grenadeThrowT <= 0,
     throwAnim: state.grenadeThrowT,
     camPos: _wmPos,
     camDir: _wmDir,
     camRight: _wmRight,
-    velocity: player.vel,
+    velocity: forcarAnim ? _wmVelDir : player.vel,
     camYaw: player.yaw,
     lookX: lookVelX,
     lookY: lookVelY,
@@ -1455,14 +1518,16 @@ function update(dt) {
 
   if ((mouseDown || touchFiring) && !vehicle) {
     const d = weapons.def;
-    const rpmInterval = 60 / d.rpm;
      if (weapons.slot === 3) {
       if (state.grenadeThrowT > 0.06) state.grenadeThrowT = 0.06;
     }
     else if (d.auto || !firedThisPress) {
-      if (state.time - lastShotT >= rpmInterval) {
-        if (weapons.canFire()) { fireBullet(); lastShotT = state.time; firedThisPress = true; }
-        else if (!d.auto || d.mag <= 0) { if (state.time - lastShotT > 0.3) { audio.dryFire(); lastShotT = state.time; } }
+      if (permiteDisparo(d.auto, state.time, lastShotT, d.rpm)) {
+        if (weapons.canFire()) {
+          lastShotT = state.time;
+          firedThisPress = true;
+          fireBullet();
+        } else if (!d.auto || d.mag <= 0) { if (state.time - lastShotT > 0.3) { audio.dryFire(); lastShotT = state.time; } }
       }
       if (!d.auto) firedThisPress = true;
     }
@@ -1858,8 +1923,47 @@ window.__fpsDebug = {
   get enemies() { return state.enemies; },
   get phys() { return phys; },
   get world() { return world; },
+  get fx() { return fx; },
+  get audio() { return audio; },
+  get cinema() { return cinema; },
+  get camera() { return camera; },
+  get scene() { return scene; },
+  get anim() { return weapons.anim; },
+  luminancia: (comArma = true) => {
+    cinema.render(scene, camera, comArma ? weapons.vmScene : null, comArma ? weapons.vmCamera : null);
+    const gl = renderer.getContext();
+    const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+    const px = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    let soma = 0, escuros = 0, medios = 0, claros = 0, n = 0, min = 255, max = 0;
+    for (let i = 0; i < px.length; i += 28) {
+      const l = 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
+      soma += l; n++;
+      if (l < 26) escuros++; else if (l > 205) claros++; else medios++;
+      if (l < min) min = l;
+      if (l > max) max = l;
+    }
+    return {
+      media: +(soma / n).toFixed(1),
+      escuros: +(100 * escuros / n).toFixed(1),
+      medios: +(100 * medios / n).toFixed(1),
+      claros: +(100 * claros / n).toFixed(1),
+      min, max,
+      exposicao: +cinema.tone.exposure.toFixed(3),
+      vinheta: cinema.tone.vignette,
+      presetVisual: Settings.get('visual'),
+    };
+  },
+  get ambient() { return weapons.ambient; },
   fireOnce: () => { if (state.running) { fireBullet(); } },
   aim: (v) => { mouse2Down = !!v; },
+  trigger: (v) => {
+    mouseDown = !!v;
+    if (!v) firedThisPress = false;
+    return mouseDown;
+  },
+  projetilDaArma: (slot) => contagemDeProjeteis(weapons.defs[slot === undefined ? weapons.slot : slot]),
+  municao: () => weapons.defs.map(d => ({ nome: d.name, classe: d.class, auto: d.auto, projeteis: contagemDeProjeteis(d), mag: d.mag, rpm: d.rpm })),
   get god() { return !!state.cheatGod; },
   set god(v) { state.cheatGod = v; player.god = v; if (v) player.health = 100; },
   spawnEnemyAt: (x, z) => {
@@ -1872,8 +1976,11 @@ window.__fpsDebug = {
   exitCar: () => { if (vehicle) exitVehicle(); return !vehicle; },
   get vehicle() { return vehicle; },
   step: (seconds, stepDt = 0.016) => {
-    const n = Math.round(seconds / stepDt);
-    for (let i = 0; i < n; i++) update(stepDt);
+    const n = Math.max(0, Math.round(seconds / stepDt));
+    for (let i = 0; i < n; i++) {
+      state.time += stepDt;
+      update(stepDt);
+    }
     return { time: +state.time.toFixed(2), hp: Math.round(player.health) };
   },
   throwGrenadeNow: () => throwGrenade(),
@@ -2077,8 +2184,9 @@ function initTouchControls() {
 }
 
 showOverlay('start');
-applyQuality();
+initQualityUi();
 initAcessibilidadeUi();
+applyQuality();
 aplicarAcessibilidade();
 audio.setMaster(Settings.get('master'));
 Settings.on(() => {
@@ -2087,6 +2195,12 @@ Settings.on(() => {
   if (weapons.laser) weapons.laser.setEnabled(weapons.laserOn && Settings.get('laser') !== false);
 });
 weapons.laserOn = Settings.get('laser') !== false;
+weaponDebug = initWeaponDebug({
+  weapons, state, player, fx, phys, camera, scene, renderer, Settings,
+  getDir, rightOf, contagemDeProjeteis,
+  tempoDesdeDisparo: () => state.time - lastShotT,
+  definirADS: (v) => { mouse2Down = !!v; },
+});
 requestAnimationFrame(frame);
 
 setInterval(() => {
