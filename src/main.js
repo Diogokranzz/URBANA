@@ -6,6 +6,7 @@ import { AudioSys } from './audio.js';
 import { Weapons } from './weapons.js';
 import { Enemy, Player, makeOperatorMesh } from './entities.js';
 import { Net } from './net.js';
+import { Cinema } from './render.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setSize(innerWidth, innerHeight);
@@ -21,13 +22,15 @@ document.getElementById('game').appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.08, 500);
 
-const world = buildWorld(scene);
+const world = buildWorld(scene, renderer);
 if (scene.fog) world.baseFog = scene.fog;
+const cinema = new Cinema(renderer, 'alta');
 const phys = new Physics(world.colliders);
 const fx = new FX(scene);
 const audio = new AudioSys();
 const player = new Player(world.spawns[0].clone().add(new THREE.Vector3(3, 0, 3)));
 const weapons = new Weapons(camera, fx, audio);
+weapons.vmScene.environment = scene.environment;
 const net = new Net(scene);
 
 audio.alertCry = (pos, camPos, camDir, camRight) => {
@@ -218,6 +221,7 @@ addEventListener('resize', () => {
   weapons.vmCamera.aspect = innerWidth / innerHeight;
   weapons.vmCamera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  cinema.setSize();
 });
 
 const $ = id => document.getElementById(id);
@@ -343,6 +347,9 @@ function applyQuality(q) {
     }
   }
   renderer.setSize(innerWidth, innerHeight);
+  cinema.setLevel(level);
+  cinema.setSize();
+  if (world.applyQuality) world.applyQuality(level);
   document.querySelectorAll('#quality button').forEach(b => b.classList.toggle('on', b.dataset.q === level));
 }
 
@@ -369,7 +376,43 @@ function saveRecordIfNeeded() {
   } catch {}
 }
 
+const compass = (() => {
+  const wrap = document.getElementById('compass');
+  const strip = document.getElementById('compass-strip');
+  const deg = document.getElementById('compass-deg');
+  if (!wrap || !strip || !deg) return null;
+  const PPD = 3.1;
+  for (let d = 0; d < 720; d += 5) {
+    const tick = document.createElement('div');
+    const maj = d % 10 === 0;
+    tick.className = 'tick' + (maj ? ' maj' : '');
+    tick.style.left = (d * PPD).toFixed(1) + 'px';
+    strip.appendChild(tick);
+    if (maj) {
+      const lab = document.createElement('span');
+      const card = { 0: 'N', 90: 'E', 180: 'S', 270: 'W', 360: 'N', 450: 'E', 540: 'S', 630: 'W' }[d];
+      lab.className = 'lab' + (card ? ' card' : '');
+      lab.textContent = card || String(d % 360).padStart(3, '0');
+      lab.style.left = (d * PPD).toFixed(1) + 'px';
+      strip.appendChild(lab);
+    }
+  }
+  return { wrap, strip, deg, ppd: PPD };
+})();
+
+function updateCompass() {
+  if (!compass) return;
+  const deg = ((360 - (player.yaw * 180 / Math.PI)) % 360 + 360) % 360;
+  const w = compass.wrap.clientWidth;
+  const off = -(deg + 360) * compass.ppd + w / 2;
+  compass.strip.style.transform = `translateX(${off.toFixed(1)}px)`;
+  const card = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(deg / 45) % 8];
+  const txt = String(Math.round(deg) % 360).padStart(3, '0') + '° ' + card;
+  if (compass.deg.textContent !== txt) compass.deg.textContent = txt;
+}
+
 function updHud() {
+  updateCompass();
   const hp = Math.round(player.health);
   hud.health.textContent = hp;
   hud.healthBar.style.width = hp + '%';
@@ -1372,14 +1415,11 @@ function render() {
   const scopeEl = document.getElementById('scope-overlay');
   if (scopeEl) scopeEl.classList.toggle('on', !!scoped);
 
-  renderer.clear();
-  renderer.render(scene, camera);
-  renderer.clearDepth();
   const showVM = state.running && !state.over && !scoped && !thirdPerson && !vehicle
     && (weapons.slot !== 3 || state.grenadeThrowT > 0);
-  if (showVM) {
-    renderer.render(weapons.vmScene, weapons.vmCamera);
-  }
+  scene.userData.animCam = camera.position;
+  world.animate(performance.now() * 0.001, 0);
+  cinema.render(scene, camera, showVM ? weapons.vmScene : null, weapons.vmCamera);
 }
 
 function menuCamera(nowT) {

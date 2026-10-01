@@ -236,6 +236,35 @@
     .chip, .chip::after, .chip-hostiles.hot .chip-value, .chip-value.bump { animation: none !important; }
   }
 
+  #compass {
+    position: absolute; top: 88px; left: 50%; transform: translateX(-50%);
+    width: min(640px, 56vw); height: 38px; overflow: hidden;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14%, #000 86%, transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, #000 14%, #000 86%, transparent 100%);
+  }
+  body.menu-aberto #compass { display: none; }
+  #compass-strip { position: absolute; top: 0; left: 0; height: 100%; will-change: transform; }
+  #compass .tick { position: absolute; top: 8px; width: 1px; height: 6px; background: rgba(226,236,242,0.42); }
+  #compass .tick.maj { top: 5px; height: 10px; background: rgba(232,238,242,0.72); }
+  #compass .lab {
+    position: absolute; top: 19px; transform: translateX(-50%); white-space: nowrap;
+    font-size: 9px; letter-spacing: 1px; color: rgba(200,214,224,0.72);
+    font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px #000;
+  }
+  #compass .lab.card { color: #e8c35a; font-weight: 800; font-size: 11px; letter-spacing: 1.5px; }
+  #compass-pin {
+    position: absolute; left: 50%; top: 0; width: 2px; height: 16px;
+    transform: translateX(-50%); background: #e8c35a;
+    box-shadow: 0 0 7px rgba(232,195,90,0.75);
+  }
+  #compass-deg {
+    position: absolute; left: 50%; top: 21px; transform: translateX(-50%);
+    padding: 1px 8px; border-radius: 3px;
+    background: rgba(8,11,14,0.72); border: 1px solid rgba(232,195,90,0.4);
+    font-size: 10px; font-weight: 800; letter-spacing: 2px; color: #f2f5f7;
+    font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px #000;
+  }
+
   #minimap-wrap {
     position: absolute; top: 20px; right: 20px;
     border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; overflow: hidden;
@@ -757,6 +786,11 @@
   <div id="loadout" class="hidden"></div>
 
   <div id="hud">
+    <div id="compass">
+      <div id="compass-strip"></div>
+      <div id="compass-pin"></div>
+      <div id="compass-deg">000° N</div>
+    </div>
     <div id="crosshair">
       <div class="l t"></div><div class="l b"></div>
       <div class="l lf"></div><div class="l rt"></div>

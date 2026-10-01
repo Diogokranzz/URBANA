@@ -12,7 +12,9 @@ FPS tático urbano em português do Brasil, feito com three.js puro e Node.js se
 
 ## Visão geral do projeto
 
-URBANA é um jogo de tiro em primeira pessoa ambientado em um cruzamento urbano ao fim da tarde. O jogador escolhe um operador entre três classes, enfrenta ondas crescentes de hostis controlados por IA e pode entrar em qualquer carro da cena para dirigir, atropelar inimigos ou usar o turbo para escapar de uma encurralada. O mapa tem prédios com janelas iluminadas, vitrines de loja, postes de luz com luminária real, hidrantes, bancas de jornal, containers, muros perimetrais e faixas de pedestres.
+URBANA é um jogo de tiro em primeira pessoa ambientado em um cruzamento urbano de madrugada. O jogador escolhe um operador entre três classes, enfrenta ondas crescentes de hostis controlados por IA e pode entrar em qualquer carro da cena para dirigir, atropelar inimigos ou usar o turbo para escapar de uma encurralada. O mapa tem prédios com janelas acesas, vitrines de loja iluminadas, letreiros de neon, postes de luz com cone de luz no ar, fachadas com escadas de incêndio, ar-condicionado e canos, grafite nas paredes, lixeiras, sacos de lixo, paletes, cones, containers, muros perimetrais, faixas de pedestres, asfalto molhado com poças que espelham as luzes e a skyline da cidade ao fundo.
+
+A cena é noturna e cinematográfica: o céu tem estrelas e o brilho alaranjado da cidade no horizonte, a névoa volumétrica azulada separa os planos, as luzes dos postes e dos letreiros se espalham pelo chão molhado e a viatura no cruzamento pisca o giroflex. O clima é ajustado por mapas de ambiente, pós-processamento com bloom, gradação de cor, aberração cromática, vinheta e grão de filme, o que aproxima o jogo do visual de um vídeo de gameplay realista.
 
 Todos os recursos do jogo são gerados por código: as texturas são desenhadas em canvas no carregamento, os sons são sintetizados com WebAudio e os bonecos são construídos por geometria procedural. Não existe download de assets externos, o que mantém o jogo leve, rápido de abrir e fácil de hospedar.
 
@@ -65,7 +67,7 @@ Em telas com toque o jogo mostra seus próprios controles: um joystick virtual n
 
 ## Qualidade gráfica
 
-O menu inicial tem um seletor de qualidade com três níveis. A baixa desliga sombras e névoa e usa resolução reduzida, a média traz sombras simples com resolução intermediária e a alta entrega o visual completo com sombras suaves, névoa e resolução máxima, pensada para computadores fortes. Em celulares e telas pequenas a baixa entra sozinha na primeira visita, e a escolha fica salva no navegador para as próximas partidas.
+O menu inicial tem um seletor de qualidade com três níveis. A baixa desliga sombras, névoa e pós-processamento e usa resolução reduzida, a média traz sombras simples, bloom mais curto e resolução intermediária, e a alta entrega o visual completo com sombras suaves, névoa, bloom de dois raios e resolução máxima, pensada para computadores fortes. A média e a alta também reduzem a quantidade de luzes pontuais acesas na cena, o que alivia a placa de vídeo sem apagar o clima da madrugada. Em celulares e telas pequenas a baixa entra sozinha na primeira visita, e a escolha fica salva no navegador para as próximas partidas.
 
 <img src="docs/divider.svg" width="100%">
 
@@ -114,19 +116,21 @@ O progresso da sessão continua vivo na interface durante o combate, e a melhor 
 ## Arquitetura do código
 
 1. server.js: servidor estático endurecido com rate limit, bloqueio de dotfiles e resolução canônica de caminhos, além da sala multiplayer com antifraude.
-2. src/main.js: loop principal, entrada, câmera, HUD, ondas, granadas, carro com turbo, atropelamento e telas de menu e morte.
-3. src/world.js: construção do mapa, texturas procedurais, iluminação, prédios, postes, carros e colisores.
-4. src/entities.js: fábrica de bonecos operadores, jogador e IA inimiga com ragdoll.
-5. src/weapons.js: viewmodel em primeira pessoa, balística, recuo, mira e supressor.
-6. src/audio.js: síntese de todos os sons, do estouro das armas ao motor do carro.
-7. src/fx.js: tracers, impactos, sangue, cápsulas ejetadas, fumaça e explosões.
-8. src/physics.js: colisão AABB, movimento de cápsula com step up e balística por segmento.
-9. src/net.js: cliente de WebSocket com reconexão automática e interpolação de jogadores remotos.
-10. index.html: telas, HUD, velocímetro e estilos.
-11. vendor/three.module.js: biblioteca three.js r160 vendada localmente, mantida intacta por ser código de terceiros.
-12. manifest.json: manifesto do aplicativo web com nome, cores e ícones.
-13. sw.js: service worker que guarda o jogo em cache para funcionar sem internet.
-14. O pequeno script de registro do service worker, que também checa atualizações em segundo plano.
+2. src/main.js: loop principal, entrada, câmera, HUD, bússola, ondas, granadas, carro com turbo, atropelamento e telas de menu e morte.
+3. src/world.js: construção do mapa, céu noturno, névoa, luz do luar com sombras, postes com cone de luz, neon, props de rua, carros e colisores.
+4. src/textures.js: fábrica de texturas procedurais em canvas, com asfalto molhado, concreto, tijolo, calçada, metal corrugado, módulos de fachada com janelas, letreiros, grafite e mapas de relevo e rugosidade.
+5. src/render.js: pipeline de pós-processamento próprio, com alvo em ponto flutuante, bloom separável, mapeamento ACES, gradação de cor, aberração cromática, vinheta e grão.
+6. src/entities.js: fábrica de bonecos operadores, jogador e IA inimiga com ragdoll.
+7. src/weapons.js: viewmodel em primeira pessoa, balística, recuo, mira e supressor.
+8. src/audio.js: síntese de todos os sons, do estouro das armas ao motor do carro.
+9. src/fx.js: tracers, impactos, sangue, cápsulas ejetadas, fumaça e explosões.
+10. src/physics.js: colisão AABB, movimento de cápsula com step up e balística por segmento.
+11. src/net.js: cliente de WebSocket com reconexão automática e interpolação de jogadores remotos.
+12. index.html: telas, HUD, bússola, velocímetro e estilos.
+13. vendor/three.module.js: biblioteca three.js r160 vendada localmente, mantida intacta por ser código de terceiros.
+14. manifest.json: manifesto do aplicativo web com nome, cores e ícones.
+15. sw.js: service worker que guarda o jogo em cache para funcionar sem internet.
+16. O pequeno script de registro do service worker, que também checa atualizações em segundo plano.
 
 <img src="docs/divider.svg" width="100%">
 
