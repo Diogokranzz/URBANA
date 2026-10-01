@@ -53,6 +53,8 @@
     zoom: var(--urb-hud-scale);
   }
   body.menu-aberto #top-center { display: none; }
+  body:not(.menu-aberto) #quality,
+  body:not(.menu-aberto) #acess { display: none !important; }
   #top-center { display: var(--urb-chips-display); }
   #minimap-wrap { display: var(--urb-minimap-display); }
 
