@@ -1,9 +1,64 @@
+import { surfaceOf } from './config/surfaces.js';
 
 export class AudioSys {
   constructor() {
     this.ctx = null;
     this.master = null;
     this.noiseBuf = null;
+    this.reverb = null;
+    this._ocluido = null;
+    this._ambiente = 'rua';
+  }
+
+  setOclusao(fn) {
+    this._ocluido = fn;
+  }
+
+  setMaster(v) {
+    this._volMestre = v;
+    if (this.master) this.master.gain.value = v;
+  }
+
+  setAmbiente(tipo) {
+    this._ambiente = tipo;
+    if (!this.reverb) return;
+    const presets = {
+      rua: { wet: 0.15, corte: 3600, cauda: 1.1 },
+      beco: { wet: 0.26, corte: 2600, cauda: 1.3 },
+      sala: { wet: 0.34, corte: 2200, cauda: 1.5 },
+      galpao: { wet: 0.46, corte: 1500, cauda: 2.1 },
+    };
+    const p = presets[tipo] || presets.rua;
+    this.reverb.wet.gain.value = p.wet;
+    this.reverb.corte.frequency.value = p.corte;
+    if (!this.reverb.bufDur || Math.abs(this.reverb.bufDur - p.cauda) > 0.2) this._initReverb(p.cauda);
+  }
+
+  _initReverb(dur = 1.1) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
+    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const d = buf.getChannelData(c);
+      let suave = 0;
+      for (let i = 0; i < len; i++) {
+        const t = i / len;
+        const bruto = Math.random() * 2 - 1;
+        suave = suave * 0.55 + bruto * 0.45;
+        d[i] = suave * Math.pow(1 - t, 2.6) * 0.8;
+      }
+    }
+    const conv = this.reverb ? this.reverb.conv : ctx.createConvolver();
+    conv.buffer = buf;
+    const corte = this.reverb ? this.reverb.corte : ctx.createBiquadFilter();
+    corte.type = 'lowpass';
+    corte.frequency.value = 2600;
+    const wet = this.reverb ? this.reverb.wet : ctx.createGain();
+    conv.connect(corte);
+    corte.connect(wet);
+    wet.connect(this.master);
+    this.reverb = { conv, corte, wet, bufDur: dur };
   }
 
   init() {
@@ -18,10 +73,13 @@ export class AudioSys {
     comp.ratio.value = 5;
     this.master.connect(comp);
     comp.connect(ctx.destination);
+    if (this._volMestre !== undefined) this.master.gain.value = this._volMestre;
     const len = ctx.sampleRate * 2;
     this.noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = this.noiseBuf.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    this._initReverb(1.1);
+    this.setAmbiente(this._ambiente);
     this.startAmbience();
   }
 
@@ -64,10 +122,26 @@ export class AudioSys {
     const side = (dx * camRight.x + dy * camRight.y + dz * camRight.z) / dist;
     const pan = ctx.createStereoPanner();
     pan.pan.value = Math.max(-1, Math.min(1, side));
+    let ocluido = false;
+    if (this._ocluido && dist > 1.4) ocluido = this._ocluido(camPos, pos);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = ocluido ? 780 : 18000;
     const g = ctx.createGain();
-    g.gain.value = Math.min(1, 6 / (dist + 2));
-    pan.connect(g); g.connect(this.master);
+    g.gain.value = Math.min(1, 6 / (dist + 2)) * (ocluido ? 0.6 : 1);
+    pan.connect(lp); lp.connect(g); g.connect(this.master);
+    if (this.reverb && !ocluido) {
+      const envio = ctx.createGain();
+      envio.gain.value = Math.min(1, 3.5 / (dist + 3));
+      g.connect(envio); envio.connect(this.reverb.conv);
+    }
     return pan;
+  }
+
+  _cauda(pos, camPos, camDir, camRight, dur, ganho, freq) {
+    const out = (pos && camPos) ? this._pan3d(pos, camPos, camDir, camRight) : this.master;
+    this._noise(dur, ganho, 'bandpass', freq, 0.6, out);
+    this._noise(dur * 1.6, ganho * 0.5, 'lowpass', freq * 0.35, 0.7, out);
   }
 
   _shotBody(out, { crack = 7.5, punch = 145, body = 0.32, tail = 0.9 } = {}) {
@@ -76,8 +150,17 @@ export class AudioSys {
     c.g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.045);
     this._tone('sine', punch, punch * 0.35, 0.14, 0.9, out);
     this._noise(body, 0.6, 'bandpass', 950, 0.9, out);
-    this._noise(tail, 0.22, 'highpass', 700, 0.5, out);
-    this._noise(tail * 0.7, 0.14, 'lowpass', 320, 0.6, out);
+    const t1 = this._noise(tail, 0.22, 'highpass', 700, 0.5, out);
+    const t2 = this._noise(tail * 0.7, 0.14, 'lowpass', 320, 0.6, out);
+    this._noise(0.025, 0.26, 'bandpass', 5200, 1.8, out);
+    this._tone('square', 3400, 1600, 0.018, 0.05, out);
+    if (this.reverb && out === this.master) {
+      const envio = ctx.createGain();
+      envio.gain.value = 0.55;
+      t1.g.connect(envio);
+      t2.g.connect(envio);
+      envio.connect(this.reverb.conv);
+    }
   }
 
   shotRifle(pos, camPos, camDir, camRight) {
@@ -225,17 +308,57 @@ export class AudioSys {
     }
   }
 
-  impact(world, matKind) {
+  impact(point, id, camPos, camDir, camRight) {
     if (!this.ctx) return;
-    if (matKind === 'metal') {
-      this._tone('triangle', 1900 + Math.random() * 700, 700, 0.12, 0.2);
-      this._noise(0.05, 0.2, 'highpass', 3500, 1);
-    } else if (matKind === 'flesh') {
-      this._noise(0.08, 0.3, 'lowpass', 700, 0.7);
-    } else {
-      this._noise(0.06, 0.22, 'bandpass', 1500 + Math.random() * 800, 1);
+    const s = surfaceOf(id);
+    const cfg = s.audio || { tail: 0.16, body: 0.05 };
+    const out = (point && camPos) ? this._pan3d(point, camPos, camDir, camRight) : this.master;
+    const ataque = 0.9 + Math.random() * 0.2;
+    const corpo = (cfg.body || 0.05) * ataque;
+    const cauda = (cfg.tail || 0.16) * (0.85 + Math.random() * 0.3);
+    switch (s.id) {
+      case 'metal':
+        this._tone('triangle', 1700 + Math.random() * 900, 620, cauda * 0.9, 0.2 * ataque, out);
+        this._noise(corpo, 0.22, 'highpass', 3200, 1, out);
+        this._noise(cauda, 0.16, 'bandpass', 2400, 1.4, out);
+        break;
+      case 'glass':
+        this._tone('sine', 2600 + Math.random() * 1400, 1400, cauda * 0.5, 0.14, out);
+        this._noise(corpo, 0.26, 'highpass', 4200, 1.2, out);
+        this._noise(cauda, 0.2, 'bandpass', 5200, 1.8, out);
+        break;
+      case 'wood':
+        this._tone('sine', 320 + Math.random() * 120, 140, corpo * 2.4, 0.26, out);
+        this._noise(corpo, 0.24, 'bandpass', 1200, 1, out);
+        this._noise(cauda, 0.12, 'lowpass', 700, 0.7, out);
+        break;
+      case 'plaster':
+        this._noise(corpo, 0.24, 'lowpass', 900, 0.6, out);
+        this._noise(cauda, 0.2, 'bandpass', 1700, 0.7, out);
+        break;
+      case 'fabric':
+        this._noise(corpo, 0.2, 'lowpass', 520, 0.7, out);
+        break;
+      case 'plastic':
+        this._tone('square', 900 + Math.random() * 400, 380, corpo * 1.6, 0.12, out);
+        this._noise(corpo, 0.18, 'bandpass', 2200, 1.2, out);
+        break;
+      case 'flesh':
+        this._noise(0.08, 0.32, 'lowpass', 640, 0.7, out);
+        this._tone('sine', 150, 70, 0.09, 0.18, out);
+        break;
+      case 'asphalt':
+        this._noise(corpo, 0.22, 'lowpass', 1100, 0.6, out);
+        this._noise(cauda, 0.14, 'bandpass', 1400, 0.9, out);
+        break;
+      default:
+        this._noise(corpo, 0.24, 'bandpass', 1500 + Math.random() * 800, 1, out);
+        this._noise(cauda, 0.17, 'lowpass', 800, 0.7, out);
+        this._tone('sine', 260, 120, corpo * 2, 0.14, out);
     }
   }
+
+
 
   ricochet(pos, camPos, camDir, camRight) {
     if (!this.ctx) return;
@@ -268,12 +391,15 @@ export class AudioSys {
   pinPull() { if (this.ctx) { this._tone('square', 1500, 900, 0.05, 0.12); } }
   throwSfx() { if (this.ctx) this._noise(0.12, 0.18, 'bandpass', 800, 1); }
 
-  footstep(run) {
+  footstep(run, superficie) {
     if (!this.ctx) return;
+    const s = surfaceOf(superficie);
     const g = run ? 0.16 : 0.08;
     const f = 300 + Math.random() * 250;
+    const agudo = s.id === 'metal' ? 3.4 : s.id === 'wood' ? 2.2 : s.id === 'asphalt' ? 1.6 : 2.8;
     this._noise(0.09, g, 'lowpass', f, 0.8);
-    this._noise(0.05, g * 0.5, 'bandpass', f * 3, 1);
+    this._noise(0.05, g * 0.5, 'bandpass', f * agudo, 1);
+    if (s.id === 'metal') this._tone('triangle', f * 6, f * 2.4, 0.05, 0.04);
   }
   jumpLand() {
     if (!this.ctx) return;

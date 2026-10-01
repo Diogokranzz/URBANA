@@ -67,7 +67,21 @@ Em telas com toque o jogo mostra seus próprios controles: um joystick virtual n
 
 ## Qualidade gráfica
 
-O menu inicial tem um seletor de qualidade com três níveis. A baixa desliga sombras, névoa e pós-processamento e usa resolução reduzida, a média traz sombras simples, bloom mais curto e resolução intermediária, e a alta entrega o visual completo com sombras suaves, névoa, bloom de dois raios e resolução máxima, pensada para computadores fortes. A média e a alta também reduzem a quantidade de luzes pontuais acesas na cena, o que alivia a placa de vídeo sem apagar o clima da madrugada. Em celulares e telas pequenas a baixa entra sozinha na primeira visita, e a escolha fica salva no navegador para as próximas partidas.
+O menu inicial tem um seletor de qualidade com cinco níveis. A baixa desliga sombras, névoa e pós-processamento e usa resolução reduzida, a média traz sombras simples, bloom mais curto e resolução intermediária, e a alta entrega o visual completo com sombras suaves, névoa, bloom de dois raios e resolução máxima, pensada para computadores fortes. A ultra mantém o pacote da alta com razão de pixels no teto e um pouco mais de bloom. A competitivo é o modo de leitura: zera grão, vinheta e aberração cromática, seca o bloom, corta partículas e decais e desliga sombras e névoa para o cenário ficar limpo e o custo cair. A média e a alta também reduzem a quantidade de luzes pontuais acesas na cena, o que alivia a placa de vídeo sem apagar o clima da madrugada. Em celulares e telas pequenas a baixa entra sozinha na primeira visita, e a escolha fica salva no navegador para as próximas partidas.
+
+<img src="docs/divider.svg" width="100%">
+
+## Arma, mira, impactos e acessibilidade
+
+A arma em primeira pessoa não é mais um bloco fixo na câmera. O comportamento vem de quatro camadas que rodam em cima de dados: aproximação da mira, balanço com inércia, recuo com recuperação e colisão com o cenário. Cada arma tem seu próprio perfil no arquivo de dados, com tempo de entrada e saída da mira, curva de aceleração, sensibilidade reduzida, intensidade de balanço, respiração, peso, padrão de recuo e limites de recolhimento. Mira, respiração e recuo param de brigar entre si porque cada camada escreve em uma faixa separada, e nada usa interpolação linear: as curvas de entrada e saída são independentes e suavizadas. Quando uma parede, caixa ou porta aparece na frente, a arma se recolhe, sobe e inclina de forma progressiva, a câmera continua livre e o deslocamento segue sendo permitido.
+
+As miras são sistemas ópticos, não desenhos na tela. A holográfica tem estrutura metálica com parafusos, vidro com transparência, brilho e sujeira discreta, um retículo projetado por dentro da lente que acompanha o ponto de impacto e se ajusta à luz do ambiente, além de paralaxe controlada: quando a arma gira em relação ao olho, o retículo se desloca dentro da lente em vez de ficar colado no vidro. O retículo pisca de leve a cada disparo e a lente some suavemente quando a mira sai do campo de visão. A luneta e o anel da pump usam o mesmo sistema com parâmetros próprios.
+
+O laser é um componente separado: sai do acessório, acompanha a arma, para em qualquer obstáculo, fica mais fraco em metal e vidro, ganha feixe opcional em ambiente com fumaça e some junto com a arma se não estiver equipado. O clarão do disparo tem camada principal, elementos secundários, fumaça, faíscas e uma luz temporária que acende a arma, as luvas e o cenário por alguns milésimos de segundo, com intensidade que pode ser reduzida nas opções.
+
+Os impactos respondem ao material atingido. Concreto, gesso, tijolo, metal, madeira, vidro, plástico, tecido, asfalto e superfície orgânica têm cada um seu decal, sua poeira, suas lascas, seu número de faíscas, seu clarão, sua faixa de áudio e sua penetração. Decais e partículas vêm de reservatórios fixos: nada é criado nem destruído no meio da partida, e cada decal tem limite por área e desaparece com fade em vez de ser apagado de uma vez. O áudio do disparo é em camadas, com estalo, corpo mecânico, cauda externa e uma reverberação por convolução que muda conforme o ambiente. O jogo mede o quanto o jogador está cercado por paredes oito vezes por segundo e troca entre rua, beco, sala e galpão, aplicando também abafamento quando o som precisa atravessar obstáculo.
+
+O HUD ganhou uma área de acessibilidade e ajuste de interface no menu inicial: escala e opacidade do HUD, safe zone para telas curvas e proporções largas, escala da mira, intensidade do tremor, do clarão e do balanço da arma, balanço de passo, visibilidade do laser, escala de sensibilidade e interruptores para mira, bússola, minimapa, indicadores, laser, sangue e efeitos de vida baixa. Tudo é salvo no navegador e pode ser restaurado para o padrão com um clique.
 
 <img src="docs/divider.svg" width="100%">
 
@@ -121,16 +135,29 @@ O progresso da sessão continua vivo na interface durante o combate, e a melhor 
 4. src/textures.js: fábrica de texturas procedurais em canvas, com asfalto molhado, concreto, tijolo, calçada, metal corrugado, módulos de fachada com janelas, letreiros, grafite e mapas de relevo e rugosidade.
 5. src/render.js: pipeline de pós-processamento próprio, com alvo em ponto flutuante, bloom separável, mapeamento ACES, gradação de cor, aberração cromática, vinheta e grão.
 6. src/entities.js: fábrica de bonecos operadores, jogador e IA inimiga com ragdoll.
-7. src/weapons.js: viewmodel em primeira pessoa, balística, recuo, mira e supressor.
-8. src/audio.js: síntese de todos os sons, do estouro das armas ao motor do carro.
-9. src/fx.js: tracers, impactos, sangue, cápsulas ejetadas, fumaça e explosões.
-10. src/physics.js: colisão AABB, movimento de cápsula com step up e balística por segmento.
-11. src/net.js: cliente de WebSocket com reconexão automática e interpolação de jogadores remotos.
-12. index.html: telas, HUD, bússola, velocímetro e estilos.
-13. vendor/three.module.js: biblioteca three.js r160 vendada localmente, mantida intacta por ser código de terceiros.
-14. manifest.json: manifesto do aplicativo web com nome, cores e ícones.
-15. sw.js: service worker que guarda o jogo em cache para funcionar sem internet.
-16. O pequeno script de registro do service worker, que também checa atualizações em segundo plano.
+7. src/weapons.js: viewmodel em primeira pessoa, balística, troca de arma, supressor e inspeção, agora ligado aos módulos de configuração e ao controlador de animação.
+8. src/config/weapon-data.js: dados de todas as armas, curvas de suavização, perfis de recuo, ópticas, laser e limites do viewmodel.
+9. src/config/surfaces.js: tabela dos materiais do cenário com decal, poeira, lascas, faíscas, clarão, áudio e penetração de cada um.
+10. src/config/settings.js: presets gráficos, opções do jogador, armazenamento local e aplicação das variáveis de acessibilidade no CSS.
+11. src/weapon/layers.js: as quatro camadas procedurais da arma, com mira, balanço, recuo e colisão.
+12. src/weapon/anim-controller.js: orquestra as camadas e a linha de eventos da recarga, da troca e da inspeção.
+13. src/weapon/attachments.js: mira holográfica, luneta, anel da pump e módulo de laser.
+14. src/audio.js: síntese de todos os sons, do estouro das armas ao motor do carro, com reverberação por convolução, abafamento por oclusão e camadas por superfície.
+15. src/fx.js: tracers, clarões de disparo, impactos por superfície, sangue, cápsulas ejetadas, fumaça e explosões, tudo com reservatórios de pool.
+16. tests/nucleo.test.mjs: testes determinísticos dos dados das armas, das superfícies, dos presets e das camadas procedurais, rodados com node tests/nucleo.test.mjs.
+17. src/physics.js: colisão AABB, movimento de cápsula com step up, balística por segmento e identificação do material de cada colisor.
+18. src/net.js: cliente de WebSocket com reconexão automática e interpolação de jogadores remotos.
+19. index.html: telas, HUD, bússola, velocímetro, painel de acessibilidade e estilos.
+20. vendor/three.module.js: biblioteca three.js r160 vendada localmente, mantida intacta por ser código de terceiros.
+21. manifest.json: manifesto do aplicativo web com nome, cores e ícones.
+22. sw.js: service worker que guarda o jogo em cache para funcionar sem internet.
+23. O pequeno script de registro do service worker, que também checa atualizações em segundo plano.
+
+<img src="docs/divider.svg" width="100%">
+
+## Testes
+
+Os sistemas determinísticos do jogo têm uma suíte própria, sem dependências externas, que roda no Node: dados das armas, tabela de superfícies, presets gráficos, opções do jogador, curvas de suavização, camadas de mira, balanço, recuo e colisão, além da linha completa de eventos da recarga. Basta rodar `node tests/nucleo.test.mjs` na raiz do projeto. No momento são 225 verificações, e qualquer regressão nos dados ou nas camadas procedurais aparece antes de subir para o site.
 
 <img src="docs/divider.svg" width="100%">
 

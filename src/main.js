@@ -7,6 +7,7 @@ import { Weapons } from './weapons.js';
 import { Enemy, Player, makeOperatorMesh } from './entities.js';
 import { Net } from './net.js';
 import { Cinema } from './render.js';
+import { Settings, aplicarAcessibilidade, GRAPHICS_PRESETS } from './config/settings.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setSize(innerWidth, innerHeight);
@@ -28,8 +29,12 @@ const cinema = new Cinema(renderer, 'alta');
 const phys = new Physics(world.colliders);
 const fx = new FX(scene);
 const audio = new AudioSys();
+audio.setOclusao((a, b) => { const h = phys.segmentHit(a, b); return !!h && h.t < 0.92; });
 const player = new Player(world.spawns[0].clone().add(new THREE.Vector3(3, 0, 3)));
-const weapons = new Weapons(camera, fx, audio);
+const weapons = new Weapons(camera, fx, audio, scene, phys);
+const _wmPos = new THREE.Vector3();
+const _wmDir = new THREE.Vector3();
+const _wmRight = new THREE.Vector3();
 weapons.vmScene.environment = scene.environment;
 const net = new Net(scene);
 
@@ -97,11 +102,15 @@ function zoomSensFactor() {
   return 1 + (target - 1) * weapons.adsK;
 }
 
+let lookVelX = 0, lookVelY = 0, lookAccX = 0, lookAccY = 0;
+
 function applyLookDelta(dx, dy) {
   const f = state.mouseSens * zoomSensFactor();
   player.yaw -= dx * MOUSE_YAW_PER_COUNT * f;
   player.pitch -= dy * MOUSE_PITCH_PER_COUNT * f;
   player.pitch = clamp(player.pitch, -1.45, 1.45);
+  lookAccX += dx * f;
+  lookAccY += dy * f;
 }
 
 function adjustSens(delta) {
@@ -166,6 +175,8 @@ addEventListener('keydown', e => {
   if (e.code === 'Digit5') weapons.switchTo(5);
   if (e.code === 'Digit6' || e.code === 'KeyG') tryThrowGrenade();
   if (e.code === 'KeyQ' && state.running && !state.over) toggleLoadout();
+  if (e.code === 'KeyI') weapons.inspect();
+  if (e.code === 'KeyL') weapons.toggleLaser();
   if (e.code === 'KeyT' && state.running && !state.over && !chatOpen) openChat();
   if (e.code === 'KeyE' && state.running && !state.over && !chatOpen) { vehicle ? exitVehicle() : enterVehicle(); }
   if (e.code === 'KeyV') toggleThirdPerson();
@@ -322,11 +333,12 @@ function applyQuality(q) {
     }
     localStorage.setItem('urbana-quality', level);
   } catch {}
-  if (level === 'baixa') {
+  const nivelBase = level === 'ultra' ? 'alta' : level === 'competitivo' ? 'media' : level;
+  if (nivelBase === 'baixa') {
     renderer.setPixelRatio(1);
     renderer.shadowMap.enabled = false;
     scene.fog = null;
-  } else if (level === 'media') {
+  } else if (nivelBase === 'media') {
     // Supersampling: em monitores 1080p (dpr 1) renderiza a 1.25x para as bordas
     // finas (miras, canos) nao serrilharem.
     renderer.setPixelRatio(Math.min(Math.max(devicePixelRatio, 1.25), 1.5));
@@ -346,11 +358,46 @@ function applyQuality(q) {
       world.sun.shadow.map = null;
     }
   }
+  const pre = GRAPHICS_PRESETS[level] || GRAPHICS_PRESETS.alta;
+  if (!pre.shadows) renderer.shadowMap.enabled = false;
+  if (!pre.fog) scene.fog = null;
+
   renderer.setSize(innerWidth, innerHeight);
-  cinema.setLevel(level);
+  cinema.setLevel(level === 'ultra' ? 'alta' : level === 'competitivo' ? 'media' : level);
   cinema.setSize();
-  if (world.applyQuality) world.applyQuality(level);
+  cinema.enabled = !!pre.postFx;
+  if (cinema.tone) {
+    if (pre.bloom !== undefined) cinema.tone.bloom = pre.bloom;
+    if (pre.grain !== undefined) cinema.tone.grain = pre.grain;
+    if (pre.vignette !== undefined) cinema.tone.vignette = pre.vignette;
+    if (pre.chroma !== undefined) cinema.tone.chroma = pre.chroma;
+    if (pre.bloomBoost !== undefined) cinema.tone.bloom *= pre.bloomBoost;
+  }
+  if (world.applyQuality) world.applyQuality(level === 'competitivo' ? 'baixa' : nivelBase);
+  if (GRAPHICS_PRESETS[level]) Settings.set('graphics', level, true);
   document.querySelectorAll('#quality button').forEach(b => b.classList.toggle('on', b.dataset.q === level));
+}
+
+let enclosureT = 0;
+const _enclDir = new THREE.Vector3();
+const _enclOrigem = new THREE.Vector3();
+function amostrarEnclosure(dt) {
+  enclosureT -= dt;
+  if (enclosureT > 0) return;
+  enclosureT = 0.6;
+  _enclOrigem.set(player.pos.x, player.pos.y + 1.4, player.pos.z);
+  let acertos = 0;
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    _enclDir.set(Math.cos(a), 0.04, Math.sin(a));
+    if (phys.segmentHit(_enclOrigem, _enclDir.clone().multiplyScalar(14).add(_enclOrigem))) acertos++;
+  }
+  state.enclosure = dampF(state.enclosure === undefined ? acertos / 8 : state.enclosure, acertos / 8, 2.4, dt);
+  const tipo = state.enclosure > 0.68 ? 'galpao' : state.enclosure > 0.42 ? 'sala' : state.enclosure > 0.18 ? 'beco' : 'rua';
+  if (tipo !== state.ambienteTipo) {
+    state.ambienteTipo = tipo;
+    audio.setAmbiente(tipo);
+  }
 }
 
 function initQualityUi() {
@@ -360,6 +407,59 @@ function initQualityUi() {
       applyQuality(b.dataset.q);
     });
   });
+}
+
+function initAcessibilidadeUi() {
+  const painel = document.getElementById('acess');
+  if (!painel) return;
+  state.mouseSens = Settings.get('sensitivity');
+  const sliders = painel.querySelectorAll('input[data-ac]');
+  const sync = () => {
+    sliders.forEach((el) => {
+      const v = Settings.get(el.dataset.ac);
+      if (v !== undefined) el.value = String(v);
+    });
+    painel.querySelectorAll('.ac-t[data-ac-t]').forEach((b) => {
+      b.classList.toggle('on', Settings.get(b.dataset.acT) !== false);
+    });
+  };
+  sliders.forEach((el) => {
+    const aplicar = () => {
+      const v = parseFloat(el.value);
+      Settings.set(el.dataset.ac, v);
+      if (el.dataset.ac === 'sensitivity') state.mouseSens = v;
+      aplicarAcessibilidade();
+    };
+    el.addEventListener('input', () => {
+      const v = parseFloat(el.value);
+      Settings.set(el.dataset.ac, v, true);
+      if (el.dataset.ac === 'sensitivity') state.mouseSens = v;
+      aplicarAcessibilidade();
+    });
+    el.addEventListener('change', () => { aplicar(); audio.uiPress(); });
+  });
+  painel.querySelectorAll('.ac-t[data-ac-t]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const k = b.dataset.acT;
+      Settings.set(k, Settings.get(k) === false);
+      if (k === 'laser') weapons.laserOn = Settings.get('laser') !== false;
+      if (weapons.laser) weapons.laser.setEnabled(weapons.laserOn && Settings.get('laser') !== false);
+      aplicarAcessibilidade();
+      sync();
+      audio.uiPress();
+    });
+  });
+  const reset = document.getElementById('ac-reset');
+  if (reset) {
+    reset.addEventListener('click', () => {
+      Settings.reset();
+      state.mouseSens = Settings.get('sensitivity');
+      aplicarAcessibilidade();
+      sync();
+      audio.uiConfirm();
+    });
+  }
+  sync();
 }
 
 function loadRecord() {
@@ -441,6 +541,20 @@ function updHud() {
   const lowAmmo = weapons.slot !== 3 && weapons.def.magSize > 0 && weapons.def.mag <= 5;
   hud.reloadHint.style.opacity = (lowAmmo || weapons.reloadT > 0) ? 1 : 0;
   hud.grenadeCd.textContent = weapons.grenadeCd > 0 ? weapons.grenadeCd.toFixed(1) : '';
+}
+
+let soloT = 0;
+let soloTipo = 'asphalt';
+const _soloA = new THREE.Vector3();
+const _soloB = new THREE.Vector3();
+function superficieAbaixo() {
+  if (soloT > 0) return soloTipo;
+  soloT = 0.35;
+  _soloA.set(player.pos.x, player.pos.y + 0.9, player.pos.z);
+  _soloB.copy(_soloA).setY(player.pos.y - 0.6);
+  const h = phys.segmentHit(_soloA, _soloB);
+  soloTipo = h ? (h.surface || h.kind) : 'asphalt';
+  return soloTipo;
 }
 
 function startWave() {
@@ -545,8 +659,10 @@ function fireBulletDir(origin, dir, d) {
     if (bestEnemy.isHead) audio.headshot();
     if (wasAlive && !bestEnemy.alive) onKill(bestEnemy, bestEnemy.isHead);
   } else if (hitWorld) {
-    fx.impact(hitWorld.point, hitWorld.normal, hitWorld.kind);
-    if (Math.random() < 0.35) audio.ricochet(hitWorld.point, origin, dir, rightOf(dir));
+    const superficie = hitWorld.surface || hitWorld.kind;
+    fx.impact(hitWorld.point, hitWorld.normal, superficie);
+    audio.impact(hitWorld.point, superficie, origin, dir, rightOf(dir));
+    if (superficie === 'metal' || Math.random() < 0.3) audio.ricochet(hitWorld.point, origin, dir, rightOf(dir));
   }
 }
 
@@ -1231,7 +1347,7 @@ function update(dt) {
 
   stepTimer -= dt * Math.hypot(player.vel.x, player.vel.z) * (1 + player.sprintK * 0.5);
   if (stepTimer <= 0 && player.onGround && Math.hypot(player.vel.x, player.vel.z) > 1.5) {
-    audio.footstep(player.sprintK > 0.5);
+    audio.footstep(player.sprintK > 0.5, superficieAbaixo());
     stepTimer = 2.4;
   }
 
@@ -1310,10 +1426,31 @@ function update(dt) {
   camera.updateProjectionMatrix();
   }
 
+  amostrarEnclosure(dt);
+  soloT -= dt;
+  const alvoLookX = clamp(lookAccX * 0.03, -1, 1);
+  const alvoLookY = clamp(lookAccY * 0.03, -1, 1);
+  lookAccX = 0; lookAccY = 0;
+  lookVelX = dampF(lookVelX, alvoLookX, 13, dt);
+  lookVelY = dampF(lookVelY, alvoLookY, 13, dt);
+  const ambiente = 1 - (state.enclosure === undefined ? 0.35 : state.enclosure);
+  weapons.setAmbient(clamp(0.18 + ambiente * 0.32 + fx.muzzleT * 0.7, 0, 1));
+
+  camera.getWorldPosition(_wmPos);
+  _wmDir.copy(getDir());
+  _wmRight.copy(rightOf(_wmDir));
   weapons.update(dt, {
     moving: vehicle ? false : moving, running: !vehicle && player.sprintK > 0.5, grounded: player.onGround,
     aimHeld: mouse2Down && state.grenadeThrowT <= 0,
     throwAnim: state.grenadeThrowT,
+    camPos: _wmPos,
+    camDir: _wmDir,
+    camRight: _wmRight,
+    velocity: player.vel,
+    camYaw: player.yaw,
+    lookX: lookVelX,
+    lookY: lookVelY,
+    moveK: player.sprintK > 0.5 ? 1 : Math.min(1, Math.hypot(player.vel.x, player.vel.z) / 5),
   });
 
   if ((mouseDown || touchFiring) && !vehicle) {
@@ -1941,6 +2078,15 @@ function initTouchControls() {
 
 showOverlay('start');
 applyQuality();
+initAcessibilidadeUi();
+aplicarAcessibilidade();
+audio.setMaster(Settings.get('master'));
+Settings.on(() => {
+  aplicarAcessibilidade();
+  audio.setMaster(Settings.get('master'));
+  if (weapons.laser) weapons.laser.setEnabled(weapons.laserOn && Settings.get('laser') !== false);
+});
+weapons.laserOn = Settings.get('laser') !== false;
 requestAnimationFrame(frame);
 
 setInterval(() => {
@@ -1952,5 +2098,6 @@ setInterval(() => {
   const sp = weapons.spread();
   const px = 8 + sp * 900 * (1 - weapons.adsK);
   hud.crosshair.style.setProperty('--gap', px + 'px');
-  hud.crosshair.style.opacity = thirdPerson ? '0.9' : (1 - weapons.adsK).toFixed(2);
+  const ocultarMira = document.documentElement.style.getPropertyValue('--urb-cross') === '0';
+  hud.crosshair.style.opacity = ocultarMira ? '0' : (thirdPerson ? '0.9' : (1 - weapons.adsK).toFixed(2));
 }, 50);

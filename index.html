@@ -33,16 +33,38 @@
 
   .hidden { display: none !important; }
 
-  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+  :root {
+    --urb-hud-scale: 1;
+    --urb-hud-opacity: 1;
+    --urb-safezone: 1;
+    --urb-cross: 1;
+    --urb-cross-display: block;
+    --urb-cross-color: #ffffff;
+    --urb-cross-scale: 1;
+    --urb-compass-display: block;
+    --urb-minimap-display: block;
+    --urb-chips-display: flex;
+  }
+
+  #hud {
+    position: fixed; pointer-events: none; z-index: 10;
+    inset: calc((1 - var(--urb-safezone)) * 3.5vh) calc((1 - var(--urb-safezone)) * 3.5vw);
+    opacity: var(--urb-hud-opacity);
+    zoom: var(--urb-hud-scale);
+  }
   body.menu-aberto #top-center { display: none; }
+  #top-center { display: var(--urb-chips-display); }
+  #minimap-wrap { display: var(--urb-minimap-display); }
 
   #crosshair {
     --gap: 10px;
+    display: var(--urb-cross-display);
     position: absolute; left: 50%; top: 50%;
     width: 0; height: 0;
+    transform: scale(var(--urb-cross-scale));
   }
   #crosshair .l {
-    position: absolute; background: rgba(255,255,255,0.85);
+    position: absolute; background: var(--urb-cross-color);
     box-shadow: 0 0 3px rgba(0,0,0,0.9);
   }
   #crosshair .t { width: 2px; height: 8px; left: -1px; top: calc(-1 * var(--gap) - 8px); }
@@ -237,6 +259,7 @@
   }
 
   #compass {
+    display: var(--urb-compass-display);
     position: absolute; top: 88px; left: 50%; transform: translateX(-50%);
     width: min(640px, 56vw); height: 38px; overflow: hidden;
     -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14%, #000 86%, transparent 100%);
@@ -453,6 +476,27 @@
   }
   #quality button.on:hover { background: linear-gradient(180deg, #ffe18c, #f0cd6a 55%, #cfa543); }
   #quality button.on:active { transform: translateY(3px); box-shadow: 0 1px 0 #6b500f, 0 2px 6px rgba(232,195,90,0.3), inset 0 1px 0 rgba(255,255,255,0.4); }
+
+  #acess {
+    margin: 14px auto 0; padding: 10px 14px 12px; width: min(760px, 88vw);
+    background: rgba(10,14,18,0.66); border: 1px solid rgba(120,140,156,0.28);
+    border-radius: 8px; max-height: 34vh; overflow: auto; text-align: left;
+  }
+  .ac-head { font-size: 10px; letter-spacing: 3px; color: #8fa8b8; margin-bottom: 8px; }
+  .ac-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 6px 18px; }
+  .ac-grid label {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    font-size: 10px; letter-spacing: 1px; color: #c6d2dc;
+  }
+  .ac-grid input[type="range"] { width: 110px; accent-color: #e8c35a; }
+  .ac-toggles { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .ac-t {
+    font-family: inherit; font-size: 9.5px; letter-spacing: 1.4px; padding: 5px 10px;
+    color: #93a3b0; background: rgba(28,34,40,0.9);
+    border: 1px solid rgba(120,140,156,0.3); border-radius: 4px; cursor: pointer;
+  }
+  .ac-t.on { color: #14181c; background: linear-gradient(180deg, #ffe18c, #f0cd6a 55%, #cfa543); border-color: #6b500f; }
+  .ac-t:hover { color: #e8eef2; }
 
   #touch-ui { position: fixed; inset: 0; z-index: 20; pointer-events: none; display: none; }
   #touch-ui.on { display: block; }
@@ -910,7 +954,32 @@
       </div><br>
       <div id="touch-tip"><b>Celular detectado:</b> joystick à esquerda move, arraste no lado direito para mirar. Atire no botão FOGO · barra embaixo troca de arma.</div>
       <button id="btn-start" class="btn">INICIAR MISSÃO</button>
-      <div id="quality"><span>QUALIDADE</span><button data-q="baixa">BAIXA</button><button data-q="media" class="on">MÉDIA</button><button data-q="alta">ALTA</button></div>
+      <div id="quality"><span>QUALIDADE</span><button data-q="baixa">BAIXA</button><button data-q="media">MÉDIA</button><button data-q="alta">ALTA</button><button data-q="ultra">ULTRA</button><button data-q="competitivo">COMPETITIVO</button></div>
+      <div id="acess">
+        <div class="ac-head">ACESSIBILIDADE E HUD</div>
+        <div class="ac-grid">
+          <label>ESCALA HUD<input type="range" data-ac="hudScale" min="0.7" max="1.4" step="0.05"></label>
+          <label>OPACIDADE HUD<input type="range" data-ac="hudOpacity" min="0.3" max="1" step="0.05"></label>
+          <label>SAFE ZONE<input type="range" data-ac="safezone" min="0.8" max="1" step="0.02"></label>
+          <label>ESCALA DA MIRA<input type="range" data-ac="crosshairScale" min="0.6" max="1.8" step="0.05"></label>
+          <label>TREMOR / SHAKE<input type="range" data-ac="shakeScale" min="0" max="1.5" step="0.05"></label>
+          <label>INTENSIDADE DO CLARÃO<input type="range" data-ac="flashScale" min="0" max="1" step="0.05"></label>
+          <label>BALANÇO DA ARMA<input type="range" data-ac="weaponSway" min="0" max="1.5" step="0.05"></label>
+          <label>BALANÇO DE PASSO<input type="range" data-ac="bobScale" min="0" max="1.5" step="0.05"></label>
+          <label>VISIBILIDADE DO LASER<input type="range" data-ac="laserVisibility" min="0.2" max="1.5" step="0.05"></label>
+          <label>ESCALA DE SENSIBILIDADE<input type="range" data-ac="sensitivity" min="0.3" max="3" step="0.1"></label>
+        </div>
+        <div class="ac-toggles">
+          <button class="ac-t" data-ac-t="crosshair">MIRA</button>
+          <button class="ac-t" data-ac-t="showCompass">BÚSSOLA</button>
+          <button class="ac-t" data-ac-t="showMinimap">MINIMAPA</button>
+          <button class="ac-t" data-ac-t="showChips">INDICADORES</button>
+          <button class="ac-t" data-ac-t="laser">LASER</button>
+          <button class="ac-t" data-ac-t="bloodEnabled">SANGUE</button>
+          <button class="ac-t" data-ac-t="lowHpEffects">EFEITOS DE VIDA BAIXA</button>
+          <button class="ac-t" id="ac-reset">RESTAURAR PADRÃO</button>
+        </div>
+      </div>
     </div>
 
     <div id="screen-pause" class="screen hidden">
