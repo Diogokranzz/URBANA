@@ -1,7 +1,16 @@
 import * as THREE from '../vendor/three.module.js';
 import { clamp, dampF } from './physics.js';
 
+function escurecer(hex, k) {
+  const v = parseInt(hex.slice(1), 16);
+  const r = ((v >> 16) & 255) * k | 0;
+  const g = ((v >> 8) & 255) * k | 0;
+  const b = (v & 255) * k | 0;
+  return `rgb(${r},${g},${b})`;
+}
+
 function grainCanvas(base, grain, scratches, wear, grooves) {
+  if (base.charAt(0) === '#') base = escurecer(base, 0.5);
   const c = document.createElement('canvas'); c.width = c.height = 512;
   const g = c.getContext('2d');
   g.fillStyle = base; g.fillRect(0, 0, 512, 512);
@@ -146,7 +155,7 @@ export class Weapons {
     const woodPair = texPair(woodC);
     const wood = new THREE.MeshStandardMaterial({
       map: woodPair.map, bumpMap: woodPair.bump, bumpScale: 0.09,
-      roughness: 0.55, metalness: 0.05,
+      roughness: 0.55, metalness: 0.05, envMapIntensity: 0.22,
     });
     const blueC = grainCanvas('#2e3238', 0.09, 26, 0.3, false);
     {
@@ -161,27 +170,27 @@ export class Weapons {
     const blued = texPair(blueC);
     const bluedMetal = new THREE.MeshStandardMaterial({
       map: blued.map, bumpMap: blued.bump, bumpScale: 0.14,
-      roughness: 0.38, metalness: 0.88,
+      roughness: 0.38, metalness: 0.88, envMapIntensity: 0.32,
     });
-    const goldM = new THREE.MeshStandardMaterial({ color: 0xb8933f, roughness: 0.3, metalness: 0.95 });
+    const goldM = new THREE.MeshStandardMaterial({ color: 0xb8933f, roughness: 0.3, metalness: 0.95, envMapIntensity: 0.5 });
 
-    const glove = new THREE.MeshStandardMaterial({ color: 0x2e3238, roughness: 0.85 });
+    const glove = new THREE.MeshStandardMaterial({ color: 0x2a2e33, roughness: 0.88, envMapIntensity: 0.2 });
     const gunmetal = new THREE.MeshStandardMaterial({
       map: steel.map, bumpMap: steel.bump, bumpScale: 0.15,
-      roughness: 0.42, metalness: 0.82,
+      roughness: 0.42, metalness: 0.82, envMapIntensity: 0.3,
     });
     const gunmetal2 = new THREE.MeshStandardMaterial({
       map: steel2.map, bumpMap: steel2.bump, bumpScale: 0.12,
-      roughness: 0.5, metalness: 0.75,
+      roughness: 0.5, metalness: 0.75, envMapIntensity: 0.26,
     });
     const polymer = new THREE.MeshStandardMaterial({
       map: poly.map, bumpMap: poly.bump, bumpScale: 0.1,
-      roughness: 0.78, metalness: 0.12,
+      roughness: 0.78, metalness: 0.12, envMapIntensity: 0.2,
     });
-    const darkMetal = new THREE.MeshStandardMaterial({ color: 0x15171b, roughness: 0.45, metalness: 0.7 });
+    const darkMetal = new THREE.MeshStandardMaterial({ color: 0x15171b, roughness: 0.45, metalness: 0.7, envMapIntensity: 0.22 });
     const grenadeMat = new THREE.MeshStandardMaterial({
       map: olive.map, bumpMap: olive.bump, bumpScale: 0.12,
-      roughness: 0.55, metalness: 0.35,
+      roughness: 0.55, metalness: 0.35, envMapIntensity: 0.5,
     });
 
     const rifle = new THREE.Group();
@@ -235,8 +244,8 @@ export class Weapons {
     const sightPost = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.009, 0.012), gunmetal);
     sightPost.position.set(0, 0.077, -0.02);
     const holoRing = new THREE.Mesh(
-      new THREE.TorusGeometry(0.028, 0.0045, 12, 32),
-      new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.4, metalness: 0.6 })
+      new THREE.TorusGeometry(0.026, 0.0032, 12, 32),
+      new THREE.MeshStandardMaterial({ color: 0x0e1013, roughness: 0.42, metalness: 0.55, envMapIntensity: 0.2 })
     );
     holoRing.position.set(0, 0.105, -0.02);
     const holoDot = new THREE.Mesh(
@@ -489,13 +498,13 @@ export class Weapons {
     this.vmScene.add(g);
     this.vmGroup = g;
     this.vmCamera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.01, 5);
-    const vmLight = new THREE.DirectionalLight(0xfff2e0, 2.4);
-    vmLight.position.set(0.6, 1.2, 0.4);
-    const vmFill = new THREE.DirectionalLight(0xbfd4ff, 1.1);
+    const vmLight = new THREE.DirectionalLight(0xffcf9c, 0.95);
+    vmLight.position.set(1.1, 0.9, 0.55);
+    const vmFill = new THREE.DirectionalLight(0x9fb8e8, 0.3);
     vmFill.position.set(-1.2, 0.2, 0.6);
-    const vmRim = new THREE.DirectionalLight(0xffffff, 1.3);
+    const vmRim = new THREE.DirectionalLight(0xcfe0ff, 0.62);
     vmRim.position.set(0.2, 0.6, -1);
-    this.vmScene.add(vmLight, vmFill, vmRim, new THREE.AmbientLight(0xffffff, 1.0));
+    this.vmScene.add(vmLight, vmFill, vmRim, new THREE.AmbientLight(0x8ba0be, 0.18));
 
     this.basePos = {
       rifle: new THREE.Vector3(0.17, -0.175, -0.38),

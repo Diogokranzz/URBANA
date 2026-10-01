@@ -1,4 +1,4 @@
-const CACHE = 'urbana.v18';
+const CACHE = 'urbana.v19';
 const ESSENCIAIS = [
   './',
   'index.html',
@@ -10,6 +10,8 @@ const ESSENCIAIS = [
   'docs/banner.svg',
   'src/main.js',
   'src/world.js',
+  'src/textures.js',
+  'src/render.js',
   'src/entities.js',
   'src/weapons.js',
   'src/audio.js',
