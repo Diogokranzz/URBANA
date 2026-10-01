@@ -48,8 +48,8 @@ export class Physics {
       else if (axis === 2) n.set(0, 0, sign);
       else n.set(0, 1, 0);
 
-      const kind = guessKind(b);
-      best = { t, point: _hit.clone(), normal: n, box: b, kind };
+      const surface = b.surface || guessSurface(b);
+      best = { t, point: _hit.clone(), normal: n, box: b, kind: surface, surface };
     }
     return best;
   }
@@ -132,9 +132,10 @@ function headroomClear(pos, newY, h, r, selfBox) {
   return true;
 }
 
-function guessKind(b) {
+function guessSurface(b) {
   const h = b.max.y - b.min.y;
   const w = b.max.x - b.min.x, d = b.max.z - b.min.z;
+  if (b.min.y < 0.05 && h < 0.3) return 'asphalt';
   if (h < 2.2 && w < 1.5 && d < 1.5) return 'metal';
   if (h < 2.0 && Math.max(w, d) < 5.5 && h > 0.8) return 'wood';
   return 'concrete';

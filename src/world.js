@@ -74,18 +74,18 @@ export function buildWorld(scene, renderer) {
     return c;
   };
 
-  const collider = (min, max) => colliders.push({ min, max });
+  const collider = (min, max, surface) => colliders.push({ min, max, surface: surface || 'concrete' });
 
-  function box(x, y, z, w, h, d, material, ry = 0) {
+  function box(x, y, z, w, h, d, material, ry = 0, surface) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
     m.position.set(x, y + h / 2, z);
     m.rotation.y = ry;
     m.castShadow = true; m.receiveShadow = true;
     scene.add(m);
     if (Math.abs(Math.sin(ry)) < 0.01) {
-      collider(new THREE.Vector3(x - w / 2, y, z - d / 2), new THREE.Vector3(x + w / 2, y + h, z + d / 2));
+      collider(new THREE.Vector3(x - w / 2, y, z - d / 2), new THREE.Vector3(x + w / 2, y + h, z + d / 2), surface);
     } else {
-      collider(new THREE.Vector3(x - d / 2, y, z - w / 2), new THREE.Vector3(x + d / 2, y + h, z + w / 2));
+      collider(new THREE.Vector3(x - d / 2, y, z - w / 2), new THREE.Vector3(x + d / 2, y + h, z + w / 2), surface);
     }
     return m;
   }
@@ -476,8 +476,8 @@ export function buildWorld(scene, renderer) {
     mat.normalMap = tex(T.facade[variant % T.facade.length].normal, bays, floors);
     mat.emissiveMap = glow;
     glow.repeat.set(bays / 8, floors / 4);
-    box(cx, 0, cz, w, h, d, mat);
-    collider(new THREE.Vector3(cx - w / 2, 0, cz - d / 2), new THREE.Vector3(cx + w / 2, h, cz + d / 2));
+    box(cx, 0, cz, w, h, d, mat, 0, 'concrete');
+    collider(new THREE.Vector3(cx - w / 2, 0, cz - d / 2), new THREE.Vector3(cx + w / 2, h, cz + d / 2), 'concrete');
 
     box(cx, h, cz, w + 0.7, 0.4, d + 0.7, concreteM());
     for (const [ox, oz, pw, pd] of [
@@ -627,7 +627,7 @@ export function buildWorld(scene, renderer) {
     decor.add(g);
     const cos = Math.abs(Math.cos(ry)), sin = Math.abs(Math.sin(ry));
     const hw = (2.5 * cos + 1.4 * sin) / 2, hd = (2.5 * sin + 1.4 * cos) / 2;
-    collider(new THREE.Vector3(x - hw, 0.22, z - hd), new THREE.Vector3(x + hw, 1.6, z + hd));
+    collider(new THREE.Vector3(x - hw, 0.22, z - hd), new THREE.Vector3(x + hw, 1.6, z + hd), 'metal');
   }
   dumpster(13.2, -16.5, 0.12, false);
   dumpster(15.4, -18.2, -0.06, true);
@@ -646,7 +646,7 @@ export function buildWorld(scene, renderer) {
       bag.castShadow = true;
       decor.add(bag);
     }
-    collider(new THREE.Vector3(bx - 0.9, 0, bz - 0.9), new THREE.Vector3(bx + 0.9, 0.8, bz + 0.9));
+    collider(new THREE.Vector3(bx - 0.9, 0, bz - 0.9), new THREE.Vector3(bx + 0.9, 0.8, bz + 0.9), 'fabric');
   }
 
   const palletM = new THREE.MeshStandardMaterial({
@@ -668,7 +668,7 @@ export function buildWorld(scene, renderer) {
     g.position.set(x, 0.22, z);
     g.rotation.y = ry;
     decor.add(g);
-    collider(new THREE.Vector3(x - 0.7, 0.2, z - 0.7), new THREE.Vector3(x + 0.7, 0.55, z + 0.7));
+    collider(new THREE.Vector3(x - 0.7, 0.2, z - 0.7), new THREE.Vector3(x + 0.7, 0.55, z + 0.7), 'wood');
   }
   pallet(20, 30, 0.4);
   pallet(-26, -30, 1.2);
@@ -713,7 +713,7 @@ export function buildWorld(scene, renderer) {
     b.position.set(side * (12.6 + (i % 4) * 3.4), 0.68, side * 10.6);
     b.castShadow = true;
     decor.add(b);
-    collider(new THREE.Vector3(b.position.x - 0.14, 0, b.position.z - 0.14), new THREE.Vector3(b.position.x + 0.14, 1.1, b.position.z + 0.14));
+    collider(new THREE.Vector3(b.position.x - 0.14, 0, b.position.z - 0.14), new THREE.Vector3(b.position.x + 0.14, 1.1, b.position.z + 0.14), 'metal');
   }
 
   function trafficLight(x, z, ry) {
@@ -742,7 +742,7 @@ export function buildWorld(scene, renderer) {
     const light = new THREE.PointLight(0x35d15a, 5, 12, 2);
     light.position.set(x + Math.cos(ry) * 2.0, 5.3, z - Math.sin(ry) * 2.0);
     scene.add(light);
-    collider(new THREE.Vector3(x - 0.18, 0, z - 0.18), new THREE.Vector3(x + 0.18, 5.6, z + 0.18));
+    collider(new THREE.Vector3(x - 0.18, 0, z - 0.18), new THREE.Vector3(x + 0.18, 5.6, z + 0.18), 'metal');
   }
   trafficLight(-11.2, -12.6, 0.2);
   trafficLight(11.2, 12.6, Math.PI + 0.2);
@@ -750,10 +750,10 @@ export function buildWorld(scene, renderer) {
   const sbMat = new THREE.MeshStandardMaterial({
     map: tex(T.concrete, 3, 1), color: 0x8a7f66, roughness: 0.9, envMapIntensity: 0.8,
   });
-  box(-24, 0, -6, 9, 1.4, 1.6, sbMat);
-  box(24, 0, 6, 9, 1.4, 1.6, sbMat);
-  box(24, 0, -6, 1.6, 1.4, 9, sbMat);
-  box(-24, 0, 6, 1.6, 1.4, 9, sbMat);
+  box(-24, 0, -6, 9, 1.4, 1.6, sbMat, 0, 'concrete');
+  box(24, 0, 6, 9, 1.4, 1.6, sbMat, 0, 'concrete');
+  box(24, 0, -6, 1.6, 1.4, 9, sbMat, 0, 'concrete');
+  box(-24, 0, 6, 1.6, 1.4, 9, sbMat, 0, 'concrete');
 
   function car(x, z, ry, color, kind) {
     const root = new THREE.Group();
@@ -912,6 +912,7 @@ export function buildWorld(scene, renderer) {
     const col = {
       min: new THREE.Vector3(x - hw, 0, z - hd),
       max: new THREE.Vector3(x + hw, 2.0, z + hd),
+      surface: 'metal',
     };
     col.carGroup = root;
     colliders.push(col);
@@ -977,7 +978,7 @@ export function buildWorld(scene, renderer) {
       scene.add(pl);
       lampLights.push(pl);
     }
-    collider(new THREE.Vector3(x - 0.2, 0, z - 0.2), new THREE.Vector3(x + 0.2, 7, z + 0.2));
+    collider(new THREE.Vector3(x - 0.2, 0, z - 0.2), new THREE.Vector3(x + 0.2, 7, z + 0.2), 'metal');
   }
   lamp(-13, -11.5, false);
   lamp(15, 11.5, true);
@@ -1027,7 +1028,7 @@ export function buildWorld(scene, renderer) {
     g.add(b, cap, n1);
     g.position.set(x, 0.22, z);
     decor.add(g);
-    collider(new THREE.Vector3(x - 0.18, 0, z - 0.18), new THREE.Vector3(x + 0.18, 0.9, z + 0.18));
+    collider(new THREE.Vector3(x - 0.18, 0, z - 0.18), new THREE.Vector3(x + 0.18, 0.9, z + 0.18), 'metal');
   }
   hydrant(14.5, 30.5);
   hydrant(-14.5, -30.5);
@@ -1053,7 +1054,7 @@ export function buildWorld(scene, renderer) {
     decor.add(g);
     const cos = Math.abs(Math.cos(ry)), sin = Math.abs(Math.sin(ry));
     const hw = (3.4 * cos + 1.8 * sin) / 2, hd = (3.4 * sin + 1.8 * cos) / 2;
-    collider(new THREE.Vector3(x - hw, 0, z - hd), new THREE.Vector3(x + hw, 2.6, z + hd));
+    collider(new THREE.Vector3(x - hw, 0, z - hd), new THREE.Vector3(x + hw, 2.6, z + hd), 'wood');
   }
   kiosk(20, 15.2, -0.4);
   kiosk(-20, -15.2, 2.7);
@@ -1064,10 +1065,10 @@ export function buildWorld(scene, renderer) {
     normalScale: new THREE.Vector2(0.7, 0.7),
     color: 0x8a8076, roughness: 0.9, envMapIntensity: 0.7,
   });
-  box(0, 0, -75, 150, 9, 2, wallMat);
-  box(0, 0, 75, 150, 9, 2, wallMat);
-  box(-75, 0, 0, 2, 9, 150, wallMat);
-  box(75, 0, 0, 2, 9, 150, wallMat);
+  box(0, 0, -75, 150, 9, 2, wallMat, 0, 'brick');
+  box(0, 0, 75, 150, 9, 2, wallMat, 0, 'brick');
+  box(-75, 0, 0, 2, 9, 150, wallMat, 0, 'brick');
+  box(75, 0, 0, 2, 9, 150, wallMat, 0, 'brick');
 
   const drumMat = new THREE.MeshStandardMaterial({
     map: tex(T.rustyMetal, 3, 1), color: 0x9a6a3a, roughness: 0.65, metalness: 0.5, envMapIntensity: 1.1,
@@ -1078,7 +1079,7 @@ export function buildWorld(scene, renderer) {
     const d = new THREE.Mesh(drumGeo, drumMat);
     d.position.set(dx, 0.75, dz); d.castShadow = true;
     scene.add(d);
-    collider(new THREE.Vector3(dx - 0.6, 0, dz - 0.6), new THREE.Vector3(dx + 0.6, 1.5, dz + 0.6));
+    collider(new THREE.Vector3(dx - 0.6, 0, dz - 0.6), new THREE.Vector3(dx + 0.6, 1.5, dz + 0.6), 'metal');
   }
 
   for (const [px, pz] of [[26, 56], [-26, -56], [56, -26], [-56, 26], [26, -56], [-26, 56]]) {
@@ -1091,7 +1092,7 @@ export function buildWorld(scene, renderer) {
     drum.position.set(px + 1.7, 0.75, pz + 0.6);
     drum.castShadow = true;
     decor.add(drum);
-    collider(new THREE.Vector3(px - 0.8, 0, pz - 0.8), new THREE.Vector3(px + 2.5, 1.5, pz + 1.4));
+    collider(new THREE.Vector3(px - 0.8, 0, pz - 0.8), new THREE.Vector3(px + 2.5, 1.5, pz + 1.4), 'wood');
     cone(px - 1.6, pz + 1.8);
     cone(px - 1.1, pz + 2.4);
   }

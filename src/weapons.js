@@ -1,5 +1,19 @@
 import * as THREE from '../vendor/three.module.js';
 import { clamp, dampF } from './physics.js';
+import { WEAPONS, RECOIL_PROFILE, VIEWMODEL } from './config/weapon-data.js';
+import { Settings } from './config/settings.js';
+import { WeaponAnimationController } from './weapon/anim-controller.js';
+import { AttachmentHost } from './weapon/attachments.js';
+
+const _camPos = new THREE.Vector3();
+const _camDir = new THREE.Vector3(0, 0, -1);
+const _camRight = new THREE.Vector3(1, 0, 0);
+const _vel = new THREE.Vector3();
+const _laserOrigem = new THREE.Vector3();
+const _laserDir = new THREE.Vector3();
+const _lente = new THREE.Vector3();
+const _lenteEixo = new THREE.Vector3();
+const _olhoLente = new THREE.Vector3();
 
 function escurecer(hex, k) {
   const v = parseInt(hex.slice(1), 16);
@@ -52,10 +66,19 @@ function texPair(canvas) {
 }
 
 export class Weapons {
-  constructor(camera, fx, audio) {
+  constructor(camera, fx, audio, worldScene, phys) {
     this.camera = camera;
     this.fx = fx;
     this.audio = audio;
+    this.worldScene = worldScene || null;
+    this.phys = phys || null;
+    this.attachments = null;
+    this.laser = null;
+    this.sight = null;
+    this.ambient = 0.3;
+    this.smokeNear = 0;
+    this.laserOn = Settings.get('laser') !== false;
+    this._slotSetup = -1;
 
     this.slot = 0;
     this.switching = 0;
@@ -76,48 +99,84 @@ export class Weapons {
     this.suppDir = 0;
     this.suppStage = 0;
 
-    this.defs = [
-      {
-        name: 'AK-47', auto: true, rpm: 600, dmg: 34, headMul: 2.8,
-        mag: 30, magSize: 30, reserve: 120, reloadTime: 2.4,
-        spreadHip: 0.026, spreadAds: 0.0045, adsFov: 58,
-        kick: 0.030, kickYaw: 0.010, speed: 330, range: 220,
-        casing: true, sfx: 'rifle',
-      },
-      {
-        name: 'DESERT EAGLE', auto: false, rpm: 240, dmg: 62, headMul: 2.4,
-        mag: 7, magSize: 7, reserve: 35, reloadTime: 2.0,
-        spreadHip: 0.020, spreadAds: 0.0035, adsFov: 62,
-        kick: 0.055, kickYaw: 0.012, speed: 300, range: 150,
-        casing: true, sfx: 'pistol',
-      },
-      {
-        name: 'SNIPER', auto: false, rpm: 45, dmg: 99, headMul: 2.0,
-        mag: 5, magSize: 5, reserve: 25, reloadTime: 3.1,
-        spreadHip: 0.055, spreadAds: 0.0002, adsFov: 16,
-        kick: 0.085, kickYaw: 0.008, speed: 480, range: 400,
-        casing: true, sfx: 'sniper', scope: true,
-      },
-      { name: 'GRANADA', mag: 0, magSize: 0 },
-      {
-        name: 'MP5-SD', auto: true, rpm: 800, dmg: 19, headMul: 2.2,
-        mag: 30, magSize: 30, reserve: 150, reloadTime: 2.1,
-        spreadHip: 0.020, spreadAds: 0.006, adsFov: 64,
-        kick: 0.014, kickYaw: 0.007, speed: 380, range: 120,
-        casing: true, sfx: 'smg',
-      },
-      {
-        name: 'PUMP 12', auto: false, rpm: 68, dmg: 12, headMul: 1.6,
-        mag: 6, magSize: 6, reserve: 32, reloadTime: 3.4,
-        spreadHip: 0.05, spreadAds: 0.042, adsFov: 66,
-        kick: 0.1, kickYaw: 0.014, speed: 300, range: 60,
-        pellets: 8, casing: false, sfx: 'shotgun',
-      },
-    ];
+    this.defs = WEAPONS.map(w => ({
+      ...w,
+      recoilProfile: w.recoil ? RECOIL_PROFILE[w.recoil] : null,
+    }));
     this.SLOT_RIFLE = 0; this.SLOT_DEAGLE = 1; this.SLOT_SNIPER = 2; this.SLOT_GRENADE = 3;
     this.SLOT_MP5 = 4; this.SLOT_PUMP = 5;
 
+    this.anim = new WeaponAnimationController(Settings.data);
+    this.throwK = 0;
+    this.moveK = 0;
+    this.blocked = false;
+
     this.buildViewModel();
+    this.setupAttachments();
+    if (phys) {
+      this.setProbe((a, b) => {
+        const h = phys.segmentHit(a, b);
+        return h ? { t: h.t, normal: h.normal, point: h.point, kind: h.surface || h.kind } : null;
+      });
+    }
+    this.syncWeapon();
+  }
+
+  setupAttachments() {
+    if (!this.worldScene) return;
+    this.attachments = new AttachmentHost(this.vmScene, this.worldScene);
+    const entradas = [
+      ['rifle', this.rifle, 0, this.rifleParts.optic],
+      ['smg', this.smg, 4, this.smgParts.optic],
+      ['sniper', this.sniper, 2, this.sniperParts.optic],
+      ['shotgun', this.shotgun, 5, this.shotgunParts ? this.shotgunParts.optic : null],
+    ];
+    for (const [chave, grupo, slot, noLegado] of entradas) {
+      const def = this.defs[slot];
+      if (!def || !grupo) continue;
+      const pos = (this.OPTICS[chave] || this.OPTICS.rifle).clone();
+      const optic = def.optic;
+      if (optic && optic.kind !== 'iron') {
+        const sight = this.attachments.addSight(chave, grupo, optic, pos);
+        if (noLegado) noLegado.visible = false;
+        sight.group.visible = false;
+      }
+      if (def.laser && def.laser.enabled) {
+        const laser = this.attachments.addLaser(chave, grupo, def.laser, pos);
+        laser.localPos = pos;
+        laser.setEnabled(this.laserOn);
+      }
+    }
+  }
+
+  syncWeapon() {
+    const d = this.def;
+    this.anim.setWeapon(d, this.currentParts(), this.opticLocalFor(d));
+    this._slotSetup = this.slot;
+    const ativo = this.attachments ? this.attachments.active(d.model) : null;
+    this.sight = ativo ? ativo.sight : null;
+    this.laser = ativo ? ativo.laser : null;
+    if (this.sight) this.sight.group.visible = true;
+    if (this.laser) this.laser.setEnabled(this.laserOn && d.laser && d.laser.enabled);
+  }
+
+  setProbe(fn) {
+    this.probe = fn;
+    this.anim.setProbe(fn);
+  }
+
+  setAmbient(v) {
+    this.ambient = clamp(v, 0, 1);
+  }
+
+  toggleLaser() {
+    const d = this.def;
+    if (!d.laser || !d.laser.enabled) return false;
+    this.laserOn = !this.laserOn;
+    Settings.set('laser', this.laserOn);
+    if (this.laser) this.laser.setEnabled(this.laserOn);
+    this.audio.reload(0);
+    return this.laserOn;
   }
 
   buildViewModel() {
@@ -261,7 +320,7 @@ export class Weapons {
       sightBase, sightPost, holoRing, holoDot
     );
     this.rifle = rifle;
-    this.rifleParts = { rMag: akMag3, holoDot };
+    this.rifleParts = { rMag: akMag3, holoDot, optic: holoRing };
 
     const handL = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.09, 0.13), glove);
     handL.position.set(0.005, -0.05, -0.33);
@@ -385,6 +444,7 @@ export class Weapons {
     sniper.add(shL, shR);
     sniper.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
     this.sniper = sniper;
+    this.sniperParts = { rMag: sMag, optic: scopeObj, bolt: sBolt };
 
     const smg = new THREE.Group();
     const m5Rec = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.07, 0.3), polymer);
@@ -423,6 +483,7 @@ export class Weapons {
     smg.add(smgL, smgR);
     smg.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
     this.smg = smg;
+    this.smgParts = { rMag: m5Mag, optic: m5Ring };
 
     const shotgun = new THREE.Group();
     // Metais e polimero LISOS (cor solida, sem textura de riscos/granulado).
@@ -473,6 +534,7 @@ export class Weapons {
     shotgun.add(sgL, sgR);
     shotgun.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
     this.shotgun = shotgun;
+    this.shotgunParts = { optic: p12Ring, pump: p12Pump };
 
     const grenade = new THREE.Group();
     const gBody = new THREE.Mesh(new THREE.SphereGeometry(0.055, 14, 12), grenadeMat);
@@ -520,17 +582,53 @@ export class Weapons {
       shotgun: new THREE.Vector3(0, -0.075, -0.26),
     };
 
-    this.slideT = 0;
+    this.OPTICS = {
+      rifle: new THREE.Vector3(0, 0.105, -0.02),
+      smg: new THREE.Vector3(0, 0.092, -0.02),
+      pistol: new THREE.Vector3(0, 0.078, -0.02),
+      sniper: new THREE.Vector3(0, 0.105, -0.12),
+      shotgun: new THREE.Vector3(0, 0.075, -0.24),
+      grenade: new THREE.Vector3(0, 0, 0),
+    };
   }
 
   get def() { return this.defs[this.slot]; }
 
+  opticLocalFor(def) {
+    const chave = (def && def.model) || 'rifle';
+    return this.OPTICS[chave] || this.OPTICS.rifle;
+  }
+
+  currentParts() {
+    const chave = (this.def && this.def.model) || 'rifle';
+    if (chave === 'pistol') return { rMag: this.pistolParts.pMag, slide: this.pistolParts.pSlide };
+    if (chave === 'smg') return { rMag: this.smgParts.rMag };
+    if (chave === 'sniper') return { rMag: this.sniperParts.rMag, slide: this.sniperParts.bolt };
+    if (chave === 'shotgun') return { slide: this.shotgunParts.pump };
+    if (chave === 'grenade') return {};
+    return { rMag: this.rifleParts.rMag };
+  }
+
+  opticNode() {
+    const chave = (this.def && this.def.model) || 'rifle';
+    if (chave === 'pistol') return null;
+    if (chave === 'smg') return this.smgParts.optic;
+    if (chave === 'sniper') return this.sniperParts.optic;
+    if (chave === 'shotgun') return this.shotgunParts.optic;
+    if (chave === 'grenade') return null;
+    return this.rifleParts.optic;
+  }
+
   switchTo(slot) {
     if (slot === this.slot || this.switching > 0 || this.suppT > 0) return;
     if (slot === 3 && this.grenades <= 0) return;
+    if (this.anim.reloading) this.anim.cancelReload('troca');
+    if (this.laser) this.laser.setEnabled(false);
+    if (this.sight) this.sight.group.visible = false;
     this.slot = slot;
-    this.switching = 0.35;
-    this.reloadT = 0;
+    this.switching = this.anim.switchDur;
+    this.anim.startSwitch();
+    this.syncWeapon();
     this.audio.reload(2);
   }
 
@@ -554,26 +652,58 @@ export class Weapons {
     this.lastShot = now;
 
     const km = this.kickMul || 1;
-    this.recoilV += d.kick * (this.ads ? 0.65 : 1) * km;
-    this.recoilYawV += (Math.random() - 0.5) * d.kickYaw * (this.ads ? 0.5 : 1) * km;
+    this.anim.shot((this.ads ? 0.62 : 1) * km);
+    this.anim.pulseSlide(1);
     this.shakeT = 0.12;
-    this.slideT = 1;
+    if (this.sight) this.sight.pulse(0.7);
+    if (this.laser) this.laser.pulse();
     return { type: 'bullet' };
   }
 
   startReload() {
     const d = this.def;
-    if (this.slot === 3 || this.reloadT > 0 || this.suppT > 0) return;
+    if (this.slot === 3 || this.anim.reloading || this.suppT > 0) return;
     if (d.mag >= d.magSize || d.reserve <= 0) return;
-    this.reloadT = d.reloadTime;
-    this.reloadStage = 0;
+    const aplicado = this.anim.startReload(d, {
+      magRelease: () => this.audio.reload(0),
+      magOut: () => this.audio.reload(1),
+      magIn: () => this.audio.reload(1),
+      boltRelease: () => this.audio.reload(2),
+      ammoCommit: () => {
+        const need = d.magSize - d.mag;
+        const take = Math.min(need, d.reserve);
+        d.mag += take;
+        d.reserve -= take;
+      },
+      reloadEnd: () => { this.audio.reload(2); },
+      reloadCancel: () => {},
+    });
+    if (aplicado) this.reloadStage = 0;
+    return aplicado;
+  }
+
+  inspect() {
+    return this.anim.startInspect();
   }
 
   spread() {
     const d = this.def;
     if (this.slot === 3) return 0;
     const base = this.ads ? d.spreadAds : d.spreadHip;
-    return base;
+    const instabilidade = 1 + this.moveK * (this.ads ? 0.85 : 1.35) + this.anim.recoil.streak * 0.06;
+    return base * instabilidade;
+  }
+
+  get aiming() {
+    return this.anim.adsActive;
+  }
+
+  sensitivityScale() {
+    return this.anim.sensitivityScale;
+  }
+
+  addImpactReaction(strength) {
+    this.anim.receiveImpact(strength);
   }
 
   toggleSuppressor() {
@@ -641,48 +771,44 @@ export class Weapons {
 
   update(dt, opts) {
     const { moving, running, grounded, aimHeld } = opts;
-    const throwAnim = opts.throwAnim || 0;
+    const d = this.def;
 
-    this.ads = !!aimHeld && this.slot !== 3 && this.reloadT <= 0 && this.suppT <= 0;
-    this.adsK = dampF(this.adsK, this.ads ? 1 : 0, 12, dt);
+    this.moveK = opts.moveK !== undefined ? opts.moveK : (moving ? (running ? 1 : 0.55) : 0);
+    this.anim.config = Settings.data;
+    if (this._slotSetup !== this.slot) this.syncWeapon();
+
+    const podeMirar = !!aimHeld && this.slot !== 3 && !this.anim.reloading && this.suppT <= 0;
+    this.anim.requestADS(podeMirar);
+    this.ads = podeMirar;
+
+    const out = this.anim.update(dt, {
+      origin: opts.camPos || _camPos.set(0, 0, 0),
+      forward: opts.camDir || _camDir,
+      right: opts.camRight || _camRight,
+      velocity: opts.velocity || _vel.set(0, 0, 0),
+      camYaw: opts.camYaw || 0,
+      lookX: opts.lookX || 0,
+      lookY: opts.lookY || 0,
+      grounded: grounded !== false,
+      running: !!running,
+    });
+
+    this.adsK = out.adsK;
+    this.reloadT = this.anim.reloadT;
+    this.reloadStage = out.reloadStage;
+    this.blocked = out.blocked;
+    this.throwK = opts.throwAnim || 0;
+    this.anim.throwK = this.throwK;
 
     if (this.switching > 0) this.switching -= dt;
-
-    if (this.reloadT > 0) {
-      const d = this.def;
-      const prev = this.reloadT;
-      this.reloadT -= dt;
-      const frac = 1 - this.reloadT / d.reloadTime;
-      if (this.reloadStage === 0 && frac > 0.15) { this.audio.reload(0); this.reloadStage = 1; }
-      if (this.reloadStage === 1 && frac > 0.55) { this.audio.reload(1); this.reloadStage = 2; }
-      if (this.reloadStage === 2 && prev > 0 && this.reloadT <= 0) {
-        const need = d.magSize - d.mag;
-        const take = Math.min(need, d.reserve);
-        d.mag += take; d.reserve -= take;
-        this.audio.reload(2);
-      }
-    }
     if (this.grenadeCd > 0) this.grenadeCd -= dt;
+    if (this.shakeT > 0) this.shakeT -= dt;
 
     if (this.suppT > 0) {
       this.suppT -= dt;
       this._suppAnim();
       if (this.suppT <= 0) this._suppAnimEnd();
     }
-
-    this.recoilV = dampF(this.recoilV, 0, 14, dt);
-    this.recoilYawV = dampF(this.recoilYawV, 0, 14, dt);
-    this.recoilK = dampF(this.recoilK, 0, 10, dt);
-    this.recoilK += this.recoilV * dt * 60;
-    this.recoilYaw += this.recoilYawV * dt * 60;
-
-    if (this.shakeT > 0) this.shakeT -= dt;
-    this.slideT = Math.max(0, this.slideT - dt * 8);
-
-    const speedFactor = moving ? (running ? 1.6 : 1.0) : 0;
-    this.bobT += dt * 9 * speedFactor;
-    const bobX = Math.sin(this.bobT) * 0.011 * speedFactor * (1 - this.adsK * 0.8);
-    const bobY = Math.abs(Math.cos(this.bobT)) * 0.009 * speedFactor * (1 - this.adsK * 0.8);
 
     const slot = this.slot;
     this.rifle.visible = slot === 0;
@@ -692,59 +818,65 @@ export class Weapons {
     this.smg.visible = slot === 4;
     this.shotgun.visible = slot === 5;
 
-    let base;
-    if (slot === 0) base = this.basePos.rifle.clone().lerp(this.adsPos.rifle, this.adsK);
-    else if (slot === 1) base = this.basePos.pistol.clone().lerp(this.adsPos.pistol, this.adsK);
-    else if (slot === 2) base = this.basePos.sniper.clone().lerp(this.adsPos.sniper, this.adsK);
-    else if (slot === 4) base = this.basePos.rifle.clone().lerp(this.adsPos.smg, this.adsK);
-    else if (slot === 5) base = this.basePos.sniper.clone().lerp(this.adsPos.shotgun, this.adsK);
-    else base = this.basePos.grenade.clone();
+    this.vmGroup.position.copy(out.pos);
+    this.vmGroup.rotation.set(out.rot.x, out.rot.y, out.rot.z);
 
-    const sw = this.switching > 0 ? Math.sin(Math.min(1, this.switching / 0.35) * Math.PI) : 0;
-
-    let reloadRot = 0, reloadDrop = 0;
-    if (this.reloadT > 0) {
-      const d = this.def;
-      const f = 1 - this.reloadT / d.reloadTime;
-      const w = Math.sin(clamp(f * 1.25, 0, 1) * Math.PI);
-      reloadRot = w * 0.55;
-      reloadDrop = w * 0.1;
-    }
-
-    let throwSwing = 0, throwRot = 0;
-    if (throwAnim > 0 && slot === 3) {
-      const p = 1 - throwAnim / 0.45;
-      throwSwing = Math.sin(p * Math.PI) * 0.14;
-      throwRot = p * p * 0.7;
-    }
-
-    this.vmGroup.position.set(
-      base.x + bobX,
-      base.y + bobY - sw * 0.25 - reloadDrop,
-      base.z + (slot === 3 ? Math.sin(this.bobT * 0.5) * 0.02 : 0) + throwSwing
-    );
-    this.vmGroup.rotation.set(
-      (-this.recoilK * 1.4 + reloadRot * 0.5 + throwRot) * (1 - this.adsK * 0.7),
-      (0.04 + this.recoilYaw * 1.2 + reloadRot * 0.4) * (1 - this.adsK),
-      (Math.sin(this.bobT * 0.5) * 0.008 * speedFactor + sw * 0.5) * (1 - this.adsK * 0.85)
-    );
-
-    if (this.slideT > 0 && this.pistolParts) {
-      this.pistolParts.pSlide.position.z = -0.1 + this.slideT * 0.05;
-    }
-
-    this.vmCamera.fov = 62 - this.adsK * (this.def.scope ? 22 : 6);
+    this.vmCamera.fov = out.fov;
     this.vmCamera.updateProjectionMatrix();
+
+    this.updateAcessorios(dt, out, opts, d);
+  }
+
+  updateAcessorios(dt, out, opts, d) {
+    if (!this.attachments) return;
+    const pos = opts.camPos || _camPos.set(0, 0, 0);
+    const dir = opts.camDir || _camDir;
+    const quatCam = this.camera.quaternion;
+
+    if (this.sight && this.sight.group.visible) {
+      this.sight.group.getWorldPosition(_lente);
+      _olhoLente.copy(_lente).normalize();
+      _lenteEixo.set(0, 0, -1).applyQuaternion(this.vmGroup.quaternion).normalize();
+      this.sight.update(dt, {
+        ambient: this.ambient,
+        adsK: out.adsK,
+        eyeToLens: _olhoLente,
+        axisDir: _lenteEixo,
+      });
+    }
+
+    if (this.laser) {
+      const lp = this.laser.localPos || this.OPTICS[this.def.model] || this.OPTICS.rifle;
+      _laserOrigem.copy(lp).applyQuaternion(quatCam).add(pos);
+      _laserDir.set(0, 0, -1).applyQuaternion(this.vmGroup.quaternion).applyQuaternion(quatCam).normalize();
+      if (dir) _laserDir.lerp(dir, 1 - out.adsK * 0.75).normalize();
+      this.laser.update(dt, {
+        origin: _laserOrigem,
+        direction: _laserDir,
+        probe: this.probe,
+        beamVisible: true,
+        smoke: this.smokeNear,
+      });
+    }
   }
 
   consumeRecoil() {
-    const p = this.recoilK, y = this.recoilYaw;
-    return { pitch: p, yaw: y };
+    return this.anim.consumeCameraRecoil();
   }
 
   ammoHud() {
     if (this.slot === 3) return { name: 'GRANADA', mag: this.grenades, reserve: '∞' };
     const d = this.def;
-    return { name: d.name, mag: d.mag, reserve: d.reserve, supp: this.slot === 1 ? this.suppOn : undefined };
+    return {
+      name: d.name,
+      mag: d.mag,
+      reserve: d.reserve,
+      supp: this.slot === 1 ? this.suppOn : undefined,
+      optic: d.optic ? d.optic.kind : 'iron',
+      laser: !!(d.laser && d.laser.enabled && this.laserOn),
+      reloading: this.anim.reloading,
+      reloadProgress: this.anim.reloadProgress,
+      blocked: this.blocked,
+    };
   }
 }
